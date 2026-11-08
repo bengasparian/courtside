@@ -1,7 +1,7 @@
 // Shared building blocks for views.
-import { esc, ordinal, logoFor, fmtTime, fmtDate, ago } from '../util.js?v=fb64bb9f50';
-import { GLOSSARY } from '../notes.js?v=fb64bb9f50';
-import { state } from '../ctx.js?v=fb64bb9f50';
+import { esc, ordinal, logoFor, fmtTime, fmtDate, ago } from '../util.js?v=4e828d4caa';
+import { GLOSSARY } from '../notes.js?v=4e828d4caa';
+import { state } from '../ctx.js?v=4e828d4caa';
 
 export function gameStatus(e) {
   const t = e?.status?.type || e?.competitions?.[0]?.status?.type || {};

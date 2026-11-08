@@ -1,6 +1,6 @@
 // Shared app state + team directory.
-import { repo, espn, safe } from './api.js?v=fb64bb9f50';
-import { teamAccent, teamBand, onColor } from './util.js?v=fb64bb9f50';
+import { repo, espn, safe } from './api.js?v=4e828d4caa';
+import { teamAccent, teamBand, onColor } from './util.js?v=4e828d4caa';
 
 export const state = {
   lg: (() => { try { return localStorage.getItem('cs-lg') || 'nba'; } catch { return 'nba'; } })(),

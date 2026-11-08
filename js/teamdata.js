@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js?v=fb64bb9f50';
-import { espn, repo, safe } from './api.js?v=fb64bb9f50';
-import { seasonYear } from './ctx.js?v=fb64bb9f50';
-import { loadRoster } from './views/players.js?v=fb64bb9f50';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=fb64bb9f50';
-import { num, normName } from './util.js?v=fb64bb9f50';
+import { L, isPro, isCollege } from './league.js?v=4e828d4caa';
+import { espn, repo, safe } from './api.js?v=4e828d4caa';
+import { seasonYear } from './ctx.js?v=4e828d4caa';
+import { loadRoster } from './views/players.js?v=4e828d4caa';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=4e828d4caa';
+import { num, normName } from './util.js?v=4e828d4caa';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
@@ -213,9 +213,10 @@ export async function lastMeeting(lg, A, B, da, year) {
   for (const tp of s?.boxscore?.players || []) {
     const st = tp.statistics?.[0];
     if (!st) continue;
-    const keys = st.names || st.keys || [];
-    const ix = k => keys.indexOf(k);
-    const rows = (st.athletes || []).filter(r => r.stats?.length).map(r => ({ name: r.athlete.displayName, id: r.athlete.id, pts: +r.stats[ix('points')] || 0, reb: +r.stats[ix('rebounds')] || 0, ast: +r.stats[ix('assists')] || 0 }));
+    const keys = st.keys || st.names || [], labels = st.labels || [];
+    const ix = (k, lab) => { let i = keys.indexOf(k); if (i < 0) i = labels.indexOf(lab); return i; };
+    const pi = ix('points', 'PTS'), ri = ix('rebounds', 'REB'), ai = ix('assists', 'AST');
+    const rows = (st.athletes || []).filter(r => r.stats?.length).map(r => ({ name: r.athlete.displayName, id: r.athlete.id, pts: +r.stats[pi] || 0, reb: +r.stats[ri] || 0, ast: +r.stats[ai] || 0 }));
     rows.sort((a, b) => b.pts - a.pts);
     top[tp.team.id] = rows.slice(0, 3);
   }

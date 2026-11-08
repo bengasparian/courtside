@@ -1,10 +1,10 @@
 // Player notes: load every player on a roster (progressively) and render full commentator cards.
-import { L, isPro, isCollege, draftLeague } from '../league.js?v=fb64bb9f50';
-import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js?v=fb64bb9f50';
-import { espn, repo, safe } from '../api.js?v=fb64bb9f50';
-import { state, myNotes, teams, seasonYear, paint, sayName } from '../ctx.js?v=fb64bb9f50';
-import { parseAthleteStats, currentSeason, advanced, playStyle, roleNotes, factNotes, parseGamelog, wikiPlayer, teamTotals, tsTier, usgTier, GLOSSARY } from '../notes.js?v=fb64bb9f50';
-import { q } from './common.js?v=fb64bb9f50';
+import { L, isPro, isCollege, draftLeague } from '../league.js?v=4e828d4caa';
+import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js?v=4e828d4caa';
+import { espn, repo, safe } from '../api.js?v=4e828d4caa';
+import { state, myNotes, teams, seasonYear, paint, sayName } from '../ctx.js?v=4e828d4caa';
+import { parseAthleteStats, currentSeason, advanced, playStyle, roleNotes, factNotes, parseGamelog, wikiPlayer, teamTotals, tsTier, usgTier, GLOSSARY } from '../notes.js?v=4e828d4caa';
+import { q } from './common.js?v=4e828d4caa';
 
 window.__csPlayers = window.__csPlayers || [];
 

@@ -2,16 +2,16 @@
 // Sticky score bar (bonus / fouls / timeouts / last play), live panel (play-by-play, alerts, game flow),
 // pregame notes (storylines, edges, projection, last meeting), and both rosters side by side with the best note,
 // tonight's line, pronunciation, coach and roster changes. Quick notes open in place; the full card slides out.
-import { L, L as LG_, isPro, isCollege } from '../league.js?v=fb64bb9f50';
-import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=fb64bb9f50';
-import { espn, safe } from '../api.js?v=fb64bb9f50';
-import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=fb64bb9f50';
-import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=fb64bb9f50';
-import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=fb64bb9f50';
-import { q } from './common.js?v=fb64bb9f50';
-import { bodyHTML } from './players.js?v=fb64bb9f50';
-import { storylines } from './matchup.js?v=fb64bb9f50';
-import { onLeave, setKeys } from '../app.js?v=fb64bb9f50';
+import { L, L as LG_, isPro, isCollege } from '../league.js?v=4e828d4caa';
+import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=4e828d4caa';
+import { espn, safe } from '../api.js?v=4e828d4caa';
+import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=4e828d4caa';
+import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=4e828d4caa';
+import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=4e828d4caa';
+import { q } from './common.js?v=4e828d4caa';
+import { bodyHTML } from './players.js?v=4e828d4caa';
+import { storylines } from './matchup.js?v=4e828d4caa';
+import { onLeave, setKeys } from '../app.js?v=4e828d4caa';
 
 const pref = {
   get(k, d) { try { return localStorage.getItem('cs-gd-' + k) ?? d; } catch { return d; } },
@@ -381,7 +381,7 @@ export async function gamedayTab(body, A, B, lg) {
     for (const tp of s.boxscore?.players || []) {
       const sst = tp.statistics?.[0];
       if (!sst) continue;
-      const keys = sst.names || sst.keys || [];
+      const keys = sst.keys || sst.names || [];
       const labels = sst.labels || [];
       for (const r of sst.athletes || []) {
         if (r.didNotPlay || !r.stats?.length) continue;
@@ -424,7 +424,7 @@ export async function gamedayTab(body, A, B, lg) {
       else if (tens === 1 && sevens >= 2) addAlert(`ddw-${p.id}`, `Double-double watch: ${nm} (${S.pts}p ${S.reb}r ${S.ast}a).`, 'watch');
       if (S.pf >= fo) addAlert(`fo-${p.id}`, `<b>${nm} has fouled out.</b>`, 'bad');
       else if (S.pf >= fo - 1) addAlert(`pf${S.pf}-${p.id}`, `${nm} picks up foul No. ${S.pf}; one more and he's out.`.replace("he's", L(lg).women ? "she's" : "he's"), 'bad');
-      else if (S.pf >= fo - 2 && (live.period || 1) <= half) addAlert(`pf${S.pf}-${p.id}`, `Foul trouble: ${nm} has ${S.pf} fouls before halftime.`, 'bad');
+      else if (S.pf >= fo - 2 && live.state === 'in' && (live.period || 1) <= half) addAlert(`pf${S.pf}-${p.id}`, `Foul trouble: ${nm} has ${S.pf} fouls before halftime.`, 'bad');
       // career milestones crossed or close tonight
       const ct = p.careerTot;
       if (ct) {
@@ -473,6 +473,7 @@ export async function gamedayTab(body, A, B, lg) {
     if (la != null || lh != null) out.push(`<div class="small">Largest lead: ${esc(live.aw.team.abbreviation)} ${esc(la ?? 0)} · ${esc(live.hm.team.abbreviation)} ${esc(lh ?? 0)}${lc != null ? ` · Lead changes: ${esc(lc)}` : ''}</div>`);
     for (const c of [live.aw, live.hm]) {
       const f = c.fouls || {};
+      if (live.state !== 'in' || (c.timeoutsRemaining == null && f.teamFoulsCurrent == null)) continue;
       out.push(`<div class="small"><b>${esc(c.team.abbreviation)}</b>: ${c.timeoutsRemaining != null ? `${c.timeoutsRemaining} timeout${c.timeoutsRemaining === 1 ? '' : 's'} left` : ''}${f.teamFoulsCurrent != null ? ` · ${f.teamFoulsCurrent} team fouls this ${L(lg).quarters ? 'quarter' : 'half'}` : ''}${f.foulsToGive != null && f.foulsToGive > 0 ? ` · ${f.foulsToGive} to give` : ''}${bonusText(f.bonusState) ? ` · <span class="chip amber">${bonusText(f.bonusState)}</span>` : ''}</div>`);
     }
     return out.join('') || '<div class="small mut">Game flow appears once play starts.</div>';
@@ -508,7 +509,7 @@ export async function gamedayTab(body, A, B, lg) {
       const st = comp.status.type;
       const aw = comp.competitors.find(c => c.homeAway === 'away'), hm = comp.competitors.find(c => c.homeAway === 'home');
       const was = live?.state;
-      live = { state: st.state, detail: st.state === 'pre' ? `${fmtDate(comp.date)} · ${fmtTime(comp.date)}` : st.shortDetail || st.detail, aw, hm, stats: parseBox(s), plays: s.plays || [], period: comp.status?.period, teamStats: s.boxscore?.teams || [] };
+      live = { state: st.state, detail: st.state === 'pre' ? `${fmtDate(comp.date)} · ${fmtTime(comp.date)}` : st.shortDetail || st.detail, aw, hm, stats: parseBox(s), plays: s.plays || [], period: comp.status?.period || (s.plays || []).slice(-1)[0]?.period?.number || 1, teamStats: s.boxscore?.teams || [] };
       const tv = (comp.broadcasts || []).map(b => b.media?.shortName).filter(Boolean).join(', ');
       const lastPlay = (live.plays || []).slice(-1)[0];
       liveEl.innerHTML = `<a href="#/${lg}/game/${ev.id}" class="gd-sc" title="Open full box score (shortcut: b)">${st.state === 'in' ? '<span class="livedot"></span>' : ''}<b>${esc(aw.team.abbreviation)} ${st.state === 'pre' ? '' : esc(aw.score)}</b><span class="mut2">–</span><b>${st.state === 'pre' ? '' : esc(hm.score)} ${esc(hm.team.abbreviation)}</b><span class="${st.state === 'in' ? 'bad b' : 'mut'} small">${esc(live.detail)}</span>${tv ? `<span class="mut small">${esc(tv)}</span>` : ''}</a>${st.state === 'in' && lastPlay ? `<span class="gd-last small" title="Last play">${esc(lastPlay.clock?.displayValue || '')} ${esc(lastPlay.text || '')}</span>` : ''}`;
