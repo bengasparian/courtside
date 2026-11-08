@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js?v=5b6412a517';
-import { espn, repo, safe } from './api.js?v=5b6412a517';
-import { seasonYear } from './ctx.js?v=5b6412a517';
-import { loadRoster } from './views/players.js?v=5b6412a517';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=5b6412a517';
-import { num, normName } from './util.js?v=5b6412a517';
+import { L, isPro, isCollege } from './league.js?v=653f72bd97';
+import { espn, repo, safe } from './api.js?v=653f72bd97';
+import { seasonYear } from './ctx.js?v=653f72bd97';
+import { loadRoster } from './views/players.js?v=653f72bd97';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=653f72bd97';
+import { num, normName } from './util.js?v=653f72bd97';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
@@ -184,8 +184,10 @@ export function coachProfile(lg, team, coach, year) {
     if (isPro(lg)) {
       const c = await safe(espn.coach(lg, coach.id), null);
       if (c) {
-        const ref = Array.isArray(c.careerRecords) ? c.careerRecords[0]?.$ref : c.careerRecords?.$ref;
-        const [car, cur] = await Promise.all([ref ? safe(espn.core(ref), null) : null, safe(espn.coachSeason(lg, year, coach.id), null)]);
+        const refs = (Array.isArray(c.careerRecords) ? c.careerRecords : [c.careerRecords]).map(x => x?.$ref).filter(Boolean).slice(0, 4);
+        const [cars, cur] = await Promise.all([Promise.all(refs.map(r => safe(espn.core(r), null))), safe(espn.coachSeason(lg, year, coach.id), null)]);
+        const games = r => (r?.summary || '').split('-').slice(0, 2).reduce((a, b) => a + (+b || 0), 0);
+        const car = cars.find(r => /total/i.test(`${r?.name} ${r?.type}`)) || cars.filter(Boolean).sort((a, b) => games(b) - games(a))[0];
         out.career = car?.summary?.replace(/-0$/, '');
         out.season = cur?.summary?.replace(/-0$/, '');
         out.seasons = (c.coachSeasons || []).length || null;

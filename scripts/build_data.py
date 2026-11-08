@@ -211,8 +211,9 @@ def pro_teams(key):
     except Exception as e:  # noqa: BLE001
         print("  division standings failed", e)
     details = pmap(lambda tid: fetch(f"{SITE}/{LG[key]}/teams/{tid}"), [t["id"] for t in teams])
+    names = {"E": "East", "W": "West", "East": "East", "West": "West"}
     for t in teams:
-        t["conf"] = conf.get(t["id"])
+        t["conf"] = names.get(conf.get(t["id"]), conf.get(t["id"]))
         t["division"] = div.get(t["id"])
         d = (details.get(t["id"]) or {}).get("team", {})
         t["standingSummary"] = d.get("standingSummary")

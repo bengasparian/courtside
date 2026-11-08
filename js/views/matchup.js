@@ -1,14 +1,14 @@
 // Matchup prep (two teams) and single-team pages.
-import { L, isPro, isCollege } from '../league.js?v=5b6412a517';
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=5b6412a517';
-import { espn, safe } from '../api.js?v=5b6412a517';
-import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=5b6412a517';
-import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=5b6412a517';
-import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=5b6412a517';
-import { kpi, q, newsList, rankCls } from './common.js?v=5b6412a517';
-import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=5b6412a517';
-import { onLeave } from '../app.js?v=5b6412a517';
-import { gamedayTab } from './gameday.js?v=5b6412a517';
+import { L, isPro, isCollege } from '../league.js?v=653f72bd97';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=653f72bd97';
+import { espn, safe } from '../api.js?v=653f72bd97';
+import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=653f72bd97';
+import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=653f72bd97';
+import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=653f72bd97';
+import { kpi, q, newsList, rankCls } from './common.js?v=653f72bd97';
+import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=653f72bd97';
+import { onLeave } from '../app.js?v=653f72bd97';
+import { gamedayTab } from './gameday.js?v=653f72bd97';
 
 // ------------------------------------------------------------------------------------------------ single team page
 export async function renderTeam(app, lg, id, params) {
@@ -205,7 +205,7 @@ async function teamTab(body, team, lg) {
     if (!ros.coach) { el.innerHTML = '<h3 class="h3">Head coach</h3><div class="small mut">Not listed.</div>'; return; }
     const c = await coachProfile(lg, team, ros.coach, d.year);
     if (!c || !body.querySelector('#coachCard')) return;
-    const rows = [['Record this season', c.season], ['Career record', c.career || c.wiki?.overall], ['Years with this team', c.exp ? `${c.exp}` : ''], ['Born', c.born ? `${c.born}${c.age ? ` (age ${c.age})` : ''}` : ''], ['Pronunciation', c.wiki?.pron]].filter(r => r[1]);
+    const rows = [['Record this season', c.season], ['Career record', c.career || c.wiki?.overall], ['Born', c.born ? `${c.born}${c.age ? ` (age ${c.age})` : ''}` : ''], ['Pronunciation', c.wiki?.pron]].filter(r => r[1]);
     el.innerHTML = `<h3 class="h3">Head coach</h3><div class="b" style="font-size:16px">${esc(c.name)}</div>
       ${rows.length ? `<table class="minitable" style="margin-top:6px"><tbody>${rows.map(([k, v]) => `<tr><td class="mut">${esc(k)}</td><td style="text-align:left;white-space:normal">${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
       ${c.wiki?.highlights?.length ? `<ul class="notes small" style="margin-top:6px">${c.wiki.highlights.slice(0, 6).map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
