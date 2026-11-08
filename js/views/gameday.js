@@ -2,16 +2,16 @@
 // Sticky score bar (bonus / fouls / timeouts / last play), live panel (play-by-play, alerts, game flow),
 // pregame notes (storylines, edges, projection, last meeting), and both rosters side by side with the best note,
 // tonight's line, pronunciation, coach and roster changes. Quick notes open in place; the full card slides out.
-import { L, L as LG_, isPro, isCollege } from '../league.js?v=1b38886051';
-import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=1b38886051';
-import { espn, safe } from '../api.js?v=1b38886051';
-import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=1b38886051';
-import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=1b38886051';
-import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=1b38886051';
-import { q } from './common.js?v=1b38886051';
-import { bodyHTML } from './players.js?v=1b38886051';
-import { storylines } from './matchup.js?v=1b38886051';
-import { onLeave, setKeys } from '../app.js?v=1b38886051';
+import { L, L as LG_, isPro, isCollege } from '../league.js?v=65d43e4ab4';
+import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=65d43e4ab4';
+import { espn, safe } from '../api.js?v=65d43e4ab4';
+import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=65d43e4ab4';
+import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=65d43e4ab4';
+import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=65d43e4ab4';
+import { q } from './common.js?v=65d43e4ab4';
+import { bodyHTML } from './players.js?v=65d43e4ab4';
+import { storylines } from './matchup.js?v=65d43e4ab4';
+import { onLeave, setKeys } from '../app.js?v=65d43e4ab4';
 
 const pref = {
   get(k, d) { try { return localStorage.getItem('cs-gd-' + k) ?? d; } catch { return d; } },

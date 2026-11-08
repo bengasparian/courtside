@@ -7,7 +7,7 @@ const SITEV2 = 'https://site.api.espn.com/apis/v2/sports/basketball/';
 const WEB = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/';
 const WEB3 = 'https://site.web.api.espn.com/apis/site/v3/sports/basketball/';
 const CORE = 'https://sports.core.api.espn.com/v2/sports/basketball/leagues/';
-import { LEAGUES } from './league.js?v=1b38886051';
+import { LEAGUES } from './league.js?v=65d43e4ab4';
 export const LG = Object.fromEntries(Object.entries(LEAGUES).map(([k, v]) => [k, v.espn]));
 
 const mem = new Map();

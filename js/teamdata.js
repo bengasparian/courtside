@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js?v=1b38886051';
-import { espn, repo, safe } from './api.js?v=1b38886051';
-import { seasonYear } from './ctx.js?v=1b38886051';
-import { loadRoster } from './views/players.js?v=1b38886051';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=1b38886051';
-import { num, normName } from './util.js?v=1b38886051';
+import { L, isPro, isCollege } from './league.js?v=65d43e4ab4';
+import { espn, repo, safe } from './api.js?v=65d43e4ab4';
+import { seasonYear } from './ctx.js?v=65d43e4ab4';
+import { loadRoster } from './views/players.js?v=65d43e4ab4';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=65d43e4ab4';
+import { num, normName } from './util.js?v=65d43e4ab4';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
@@ -74,7 +74,11 @@ export function teamData(lg, team) {
     } else {
       for (const [conf, rows] of Object.entries(standings || {})) {
         const r = rows.find(x => x.id === team.id);
-        if (r) { d.std = { ...r, confName: conf, confSize: rows.length, confRows: rows }; break; }
+        if (r) {
+          const started = rows.some(x => (x.cw || 0) + (x.cl || 0) > 0);
+          d.std = { ...r, confRank: started ? r.confRank : null, confName: conf, confSize: rows.length, confRows: rows };
+          break;
+        }
       }
       const rk = extra[0];
       d.polls = (rk?.rankings || []).map(p => ({ name: p.name, rank: p.ranks?.find(r => r.team?.id === team.id) })).filter(x => x.rank);

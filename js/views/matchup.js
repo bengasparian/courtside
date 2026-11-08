@@ -1,14 +1,14 @@
 // Matchup prep (two teams) and single-team pages.
-import { L, isPro, isCollege } from '../league.js?v=1b38886051';
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=1b38886051';
-import { espn, safe } from '../api.js?v=1b38886051';
-import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=1b38886051';
-import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=1b38886051';
-import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=1b38886051';
-import { kpi, q, newsList, rankCls } from './common.js?v=1b38886051';
-import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=1b38886051';
-import { onLeave } from '../app.js?v=1b38886051';
-import { gamedayTab } from './gameday.js?v=1b38886051';
+import { L, isPro, isCollege } from '../league.js?v=65d43e4ab4';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=65d43e4ab4';
+import { espn, safe } from '../api.js?v=65d43e4ab4';
+import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=65d43e4ab4';
+import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=65d43e4ab4';
+import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=65d43e4ab4';
+import { kpi, q, newsList, rankCls } from './common.js?v=65d43e4ab4';
+import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=65d43e4ab4';
+import { onLeave } from '../app.js?v=65d43e4ab4';
+import { gamedayTab } from './gameday.js?v=65d43e4ab4';
 
 // ------------------------------------------------------------------------------------------------ single team page
 export async function renderTeam(app, lg, id, params) {
@@ -108,7 +108,7 @@ async function fillHeader(app, team, lg) {
   }
   if (isCollege(lg)) {
     for (const p of d.polls || []) chips.push(`${/AP/.test(p.name) ? 'AP' : 'Coaches'} #${p.rank.current}`);
-    if (s) chips.push(s.overall, `${s.conf || '0-0'} conf (${ordinal(s.confRank)} of ${s.confSize})`, s.streak ? `Streak ${s.streak}` : '');
+    if (s) chips.push(s.overall, `${s.conf || '0-0'} conf${s.confRank ? ` (${ordinal(s.confRank)} of ${s.confSize})` : ''}`, s.streak ? `Streak ${s.streak}` : '');
     if (d.net && d.netCurrent) chips.push(`NET #${d.net.Rank}`);
   }
   if (d.bpi?.bpirank) chips.push(`BPI #${d.bpi.bpirank}`);
@@ -275,7 +275,7 @@ function outlookHTML(d, lg, team) {
     }
     if (d.net) out.push(`<div class="small" style="margin-top:8px"><b>NET${d.netCurrent ? '' : ' (last season final)'}: #${esc(d.net.Rank)}</b>${q('net_rank', 'cbb')} · Quad 1: ${esc(d.net['Quad 1'])} · Q2: ${esc(d.net['Quad 2'])} · Q3: ${esc(d.net['Quad 3'])} · Q4: ${esc(d.net['Quad 4'])}${d.netCurrent ? '' : ' <span class="mut">(the NCAA publishes this season\'s NET starting in early December)</span>'}</div>`);
     if (ap) out.push(`<div class="small" style="margin-top:6px">AP Poll: <b>#${ap.rank.current}</b>${ap.rank.previous ? ` (last week #${ap.rank.previous})` : ''}${ap.rank.points ? ` · ${ap.rank.points} pts` : ''}${ap.rank.firstPlaceVotes ? ` · ${ap.rank.firstPlaceVotes} first-place votes` : ''}</div>`);
-    if (d.std) out.push(`<div class="small" style="margin-top:6px">${esc(d.std.confName)}: ${ordinal(d.std.confRank)} of ${d.std.confSize} (${esc(d.std.conf || '0-0')} in conference play)</div>`);
+    if (d.std) out.push(`<div class="small" style="margin-top:6px">${esc(d.std.confName)}: ${d.std.confRank ? `${ordinal(d.std.confRank)} of ${d.std.confSize} (${esc(d.std.conf || '0-0')} in conference play)` : 'conference play has not started yet'}</div>`);
     out.push('<div class="src">Projections and tournament odds: ESPN BPI. NET: NCAA. Seeds are projections, not bracketology picks.</div>');
   }
   return out.join('') || '<div class="small mut">No projections available yet.</div>';
@@ -456,7 +456,7 @@ export function storylines(A, B, da, db, lg, rA, rB) {
   } else {
     const ap = d => d.polls?.find(p => /AP/.test(p.name))?.rank?.current;
     if (ap(da) || ap(db)) s.push(`${ap(da) ? `No. ${ap(da)} ` : 'Unranked '}${esc(A.short || A.name)} vs ${ap(db) ? `No. ${ap(db)} ` : 'unranked '}${esc(B.short || B.name)}.`);
-    if (da.std && db.std && da.std.confName === db.std.confName) s.push(`Conference game in the ${esc(da.std.confName)}: ${esc(A.short)} is ${ordinal(da.std.confRank)} (${esc(da.std.conf || '0-0')}), ${esc(B.short)} is ${ordinal(db.std.confRank)} (${esc(db.std.conf || '0-0')}).`);
+    if (da.std && db.std && da.std.confName === db.std.confName) s.push(da.std.confRank ? `Conference game in the ${esc(da.std.confName)}: ${esc(A.short)} is ${ordinal(da.std.confRank)} (${esc(da.std.conf || '0-0')}), ${esc(B.short)} is ${ordinal(db.std.confRank)} (${esc(db.std.conf || '0-0')}).` : `Conference game in the ${esc(da.std.confName)}.`);
     const seed = d => d.bpi?.projectedtournamentseed;
     if ((seed(da) || seed(db)) && Object.values(da.bpiAll || {}).some(x => x.projectedtournamentseed)) s.push(`March Madness: ESPN BPI projects ${esc(A.short)} ${seed(da) ? 'as a ' + Math.round(seed(da)) + ' seed' : 'outside the field'} and ${esc(B.short)} ${seed(db) ? 'as a ' + Math.round(seed(db)) + ' seed' : 'outside the field'}.`);
     const pros = [...(rA.players || []), ...(rB.players || [])].filter(p => p.mock || (p.board && p.board.pick <= 40));

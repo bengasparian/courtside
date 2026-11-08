@@ -1,11 +1,11 @@
 // College hub: polls & rankings, conferences, March Madness projections, transfer portal, draft prospects.
-import { esc, f1, pct, ordinal, signed, logoFor, stars, ymd, fmtDate } from '../util.js?v=1b38886051';
-import { espn, repo, safe } from '../api.js?v=1b38886051';
-import { state, teams, seasonYear } from '../ctx.js?v=1b38886051';
-import { newsList, teamCell, q, sortable } from './common.js?v=1b38886051';
-import { draftView } from './nbahub.js?v=1b38886051';
-import { netFor, netIsCurrent } from '../teamdata.js?v=1b38886051';
-import { L, draftLeague } from '../league.js?v=1b38886051';
+import { esc, f1, pct, ordinal, signed, logoFor, stars, ymd, fmtDate } from '../util.js?v=65d43e4ab4';
+import { espn, repo, safe } from '../api.js?v=65d43e4ab4';
+import { state, teams, seasonYear } from '../ctx.js?v=65d43e4ab4';
+import { newsList, teamCell, q, sortable } from './common.js?v=65d43e4ab4';
+import { draftView } from './nbahub.js?v=65d43e4ab4';
+import { netFor, netIsCurrent } from '../teamdata.js?v=65d43e4ab4';
+import { L, draftLeague } from '../league.js?v=65d43e4ab4';
 
 let T, CL = 'cbb';
 export async function render(app, view, params, lg = 'cbb') {
