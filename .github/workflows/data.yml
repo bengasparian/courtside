@@ -1,10 +1,22 @@
 name: Courtside data
 
+# Keeps the site's data fresh with no manual work. Every 2 hours it rebuilds the league-wide data the site can't read
+# straight from the browser (team ranks, power rankings, NBA Cup groups, BPI, conference standings, NET, draft boards,
+# recruiting rankings, transfer portal) and publishes it to the `data` branch. Each source has its own refresh interval
+# inside scripts/build_data.py, and a failing source keeps its last good file.
+# Live scores, rosters, player stats and news are read by the site directly from ESPN in real time.
 on:
+  schedule:
+    - cron: "17 */2 * * *"
   push:
     branches: [main]
     paths: ["scripts/**", ".github/workflows/data.yml"]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild every source now"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -16,20 +28,24 @@ concurrency:
 jobs:
   data:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
           sparse-checkout: scripts
+      - name: Get current data (so unchanged sources are kept)
+        run: |
+          git clone --depth 1 -b data "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" out || mkdir -p out
+          rm -rf out/.git out/probe
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Probe sources
-        run: python scripts/probe.py out/probe
+      - name: Build data
+        run: python scripts/build_data.py out ${{ (inputs.force || github.event_name == 'push') && '--force' || '' }}
       - name: Publish to data branch
         run: |
           cd out
           git init -q -b data
           git config user.name "courtside-bot"; git config user.email "actions@users.noreply.github.com"
-          git add -A && git commit -qm "Courtside data $(date -u +%FT%TZ)"
+          git add -A && git commit -qm "Data $(date -u +%FT%TZ)"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
