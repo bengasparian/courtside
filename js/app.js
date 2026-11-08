@@ -39,7 +39,7 @@ async function route() {
   window.scrollTo(0, 0);
   try {
     if (view === '') (await import('./views/home.js')).render(app, lg);
-    else if (view === 'matchup') (await import('./views/matchup.js')).render(app, lg, parts[2], parts[3], parts[4] || 'overview', params);
+    else if (view === 'matchup') (await import('./views/matchup.js')).render(app, lg, parts[2], parts[3], parts[4] || 'gameday', params);
     else if (view === 'team') (await import('./views/matchup.js')).renderTeam(app, lg, parts[2], params);
     else if (view === 'game') (await import('./views/game.js')).render(app, lg, parts[2]);
     else if (view === 'scores') (await import('./views/scores.js')).render(app, lg, params);
@@ -138,6 +138,9 @@ document.querySelectorAll('#leagueSeg button').forEach(b => b.addEventListener('
   $('#foot').innerHTML = `Live data: ESPN (scores, rosters, stats, news) · League tables refreshed every 2 hours (last: ${built}) · Background: Wikipedia · Recruiting &amp; portal: On3 · Draft: Tankathon · NET: NCAA.<br>Notes you type are saved only in this browser. <a href="https://github.com/bengasparian/courtside">Source</a>`;
 })();
 
+const setTopH = () => document.documentElement.style.setProperty('--toph', ($('.top')?.offsetHeight || 98) + 'px');
+try { new ResizeObserver(setTopH).observe($('.top')); } catch { window.addEventListener('resize', setTopH); }
+setTopH();
 window.addEventListener('hashchange', route);
 void ymd; void repo;
 route();

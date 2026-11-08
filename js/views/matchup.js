@@ -7,6 +7,7 @@ import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.j
 import { kpi, q, newsList, rankCls } from './common.js';
 import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js';
 import { onLeave } from '../app.js';
+import { gamedayTab } from './gameday.js';
 
 // ------------------------------------------------------------------------------------------------ single team page
 export async function renderTeam(app, lg, id, params) {
@@ -37,17 +38,17 @@ export async function render(app, lg, aId, bId, tab) {
   if (!A || !B) { app.innerHTML = '<div class="err">One of these teams could not be found.</div>'; return; }
   const root = document.documentElement;
   paint(root, A, 'a'); paint(root, B, 'b');
-  paint(root, tab.startsWith('b') ? B : A, 'acc');
+  paint(root, tab === 'b' || tab === 'b-players' ? B : A, 'acc');
   const base = `#/${lg}/matchup/${aId}/${bId}`;
-  const tabs = [['overview', 'Matchup'], ['a', `<img src="${esc(logoFor(A, state.theme))}" alt="">${esc(A.abbr)} team`], ['a-players', `${esc(A.abbr)} players`],
+  const tabs = [['gameday', '⚡ Game Day'], ['overview', 'Matchup'], ['a', `<img src="${esc(logoFor(A, state.theme))}" alt="">${esc(A.abbr)} team`], ['a-players', `${esc(A.abbr)} players`],
     ['b', `<img src="${esc(logoFor(B, state.theme))}" alt="">${esc(B.abbr)} team`], ['b-players', `${esc(B.abbr)} players`], ['board', 'Spotting board']];
   app.innerHTML = `
-    <div class="mh">
+    <div class="mh ${tab === 'gameday' ? 'slim' : ''}">
       <a class="side a" href="#/${lg}/team/${A.id}"><img class="logo" src="${esc(A.logo)}" alt=""><div><div class="nm">${esc(A.name)}</div><div class="sub" id="subA">&nbsp;</div></div></a>
       <div class="mid" id="mid"><div class="tiny" style="opacity:.7">MATCHUP</div><div class="big">${esc(A.abbr)} @ ${esc(B.abbr)}</div><div class="tiny" id="midInfo" style="opacity:.8"></div></div>
       <a class="side b" href="#/${lg}/team/${B.id}"><div><div class="nm">${esc(B.name)}</div><div class="sub" id="subB">&nbsp;</div></div><img class="logo" src="${esc(B.logo)}" alt=""></a>
     </div>
-    <div class="tabs noprint">${tabs.map(([k, l]) => `<a href="${base}/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}<span class="sp"></span><a class="mut" href="${`#/${lg}/matchup/${bId}/${aId}/${tab.replace(/^a/, 'x').replace(/^b/, 'a').replace(/^x/, 'b')}`}" title="Swap home/away">⇄</a></div>
+    <div class="tabs noprint">${tabs.map(([k, l]) => `<a href="${base}/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}<span class="sp"></span><a class="mut" href="${`#/${lg}/matchup/${bId}/${aId}/${({ a: 'b', b: 'a', 'a-players': 'b-players', 'b-players': 'a-players' })[tab] || tab}`}" title="Swap home/away">⇄</a></div>
     <div id="body"></div>`;
   const body = app.querySelector('#body');
   // header subtitles
@@ -59,7 +60,8 @@ export async function render(app, lg, aId, bId, tab) {
   });
   // kick off both rosters so every tab is instant
   roster(lg, A); roster(lg, B);
-  if (tab === 'overview') overviewTab(body, A, B, lg);
+  if (tab === 'gameday') gamedayTab(body, A, B, lg);
+  else if (tab === 'overview') overviewTab(body, A, B, lg);
   else if (tab === 'a') teamTab(body, A, lg);
   else if (tab === 'b') teamTab(body, B, lg);
   else if (tab === 'a-players') playersTab(body, A, lg);
@@ -182,7 +184,7 @@ async function teamTab(body, team, lg) {
     const hurt = ros.players.filter(p => p.injury);
     inj.innerHTML = `<h3 class="h3">Injury report</h3>${hurt.length ? `<table class="minitable"><tbody>${hurt.map(p => `<tr><td>${esc(p.name)}</td><td class="inj" style="white-space:normal">${esc(p.injury)}</td></tr>`).join('')}</tbody></table>` : '<div class="small mut">No injuries listed.</div>'}<div class="src">Source: ESPN roster injury designations.</div>`;
     const list = ros.players.slice().sort((a, b) => (b.cur?.a?.avgMinutes || 0) - (a.cur?.a?.avgMinutes || 0));
-    mini.innerHTML = `<div class="row"><h3 class="h3" style="margin:0">Roster</h3><span class="sp"></span><a class="link small" href="${location.hash.includes('/matchup/') ? location.hash.replace(/\/(a|b)$/, '/$1-players') : `#/${lg}/team/${team.id}?tab=players`}">Full player notes →</a></div>
+    mini.innerHTML = `<div class="row"><h3 class="h3" style="margin:0">Roster</h3><span class="sp"></span><a class="link small" href="${/\/matchup\/\d+\/\d+\/(a|b)$/.test(location.hash) ? location.hash + '-players' : `#/${lg}/team/${team.id}?tab=players`}">Full player notes →</a></div>
       <div class="tscroll"><table class="minitable" style="margin-top:6px"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Ht</th><th>PTS</th><th>REB</th><th>AST</th><th>MIN</th></tr></thead><tbody>
       ${list.map(p => `<tr><td>${esc(p.jersey ?? '')}</td><td class="l"><a href="#/${lg}/player/${p.id}/${team.id}">${esc(p.name)}</a>${p.injShort ? ` <span class="inj tiny">${esc(p.injShort)}</span>` : ''}</td><td>${esc(p.pos || '')}</td><td>${esc(p.ht || '')}</td><td>${f1(p.cur?.a?.avgPoints)}</td><td>${f1(p.cur?.a?.avgRebounds)}</td><td>${f1(p.cur?.a?.avgAssists)}</td><td>${f1(p.cur?.a?.avgMinutes)}</td></tr>`).join('')}
       </tbody></table></div>${ros.coach ? `<div class="small mut" style="margin-top:6px">Head coach: <b>${esc(ros.coach.firstName)} ${esc(ros.coach.lastName)}</b>${ros.coach.experience ? ` (${ros.coach.experience} yrs)` : ''}</div>` : ''}`;
@@ -381,7 +383,7 @@ async function overviewTab(body, A, B, lg) {
     const keyp = body.querySelector('#keyp'), inj = body.querySelector('#injboth'), story = body.querySelector('#story');
     if (!keyp) return;
     const top = (ros) => ros.players.filter(p => p.cur?.a?.gamesPlayed).sort((x, y) => (y.cur.a.avgPoints + y.cur.a.avgRebounds * .5 + y.cur.a.avgAssists * .7) - (x.cur.a.avgPoints + x.cur.a.avgRebounds * .5 + x.cur.a.avgAssists * .7)).slice(0, 3);
-    const pl = (p, team, side) => `<a class="row" href="${location.hash.replace(/\/[^/]+$/, '/' + side + '-players')}" style="padding:6px 0;border-bottom:1px solid var(--line2)"><img src="${esc(p.headshot || '')}" alt="" style="width:52px;height:38px;object-fit:cover;object-position:top;border-radius:6px;background:var(--chip)" onerror="this.style.visibility='hidden'"><div style="min-width:0"><div class="b">${esc(p.name)} <span class="mut small">#${esc(p.jersey ?? '')} ${esc(p.pos || '')}</span></div><div class="small mut">${f1(p.cur.a.avgPoints)} pts · ${f1(p.cur.a.avgRebounds)} reb · ${f1(p.cur.a.avgAssists)} ast${p.adv?.ts ? ` · ${f1(p.adv.ts)} TS%` : ''}</div><div class="small">${esc(playStyle(p, lg).filter(x => !x.startsWith('('))[0] || '')}</div></div></a>`;
+    const pl = (p, team, side) => `<a class="row" href="#/${lg}/matchup/${A.id}/${B.id}/${side}-players" style="padding:6px 0;border-bottom:1px solid var(--line2)"><img src="${esc(p.headshot || '')}" alt="" style="width:52px;height:38px;object-fit:cover;object-position:top;border-radius:6px;background:var(--chip)" onerror="this.style.visibility='hidden'"><div style="min-width:0"><div class="b">${esc(p.name)} <span class="mut small">#${esc(p.jersey ?? '')} ${esc(p.pos || '')}</span></div><div class="small mut">${f1(p.cur.a.avgPoints)} pts · ${f1(p.cur.a.avgRebounds)} reb · ${f1(p.cur.a.avgAssists)} ast${p.adv?.ts ? ` · ${f1(p.adv.ts)} TS%` : ''}</div><div class="small">${esc(playStyle(p, lg).filter(x => !x.startsWith('('))[0] || '')}</div></div></a>`;
     keyp.innerHTML = `<h3 class="h3">Players to watch</h3><div class="grid g2" style="gap:12px"><div><div class="small b" style="color:var(--a-txt)">${esc(A.name)}</div>${rA.ready ? top(rA).map(p => pl(p, A, 'a')).join('') || '<div class="small mut">No stats yet.</div>' : '<div class="loading"></div>'}</div><div><div class="small b" style="color:var(--b-txt)">${esc(B.name)}</div>${rB.ready ? top(rB).map(p => pl(p, B, 'b')).join('') || '<div class="small mut">No stats yet.</div>' : '<div class="loading"></div>'}</div></div>`;
     const hurt = (ros, t) => ros.ready ? (ros.players.filter(p => p.injury).map(p => `<tr><td>${esc(t.abbr)}</td><td class="l">${esc(p.name)}</td><td class="inj" style="white-space:normal;text-align:left">${esc(p.injury)}</td></tr>`).join('')) : '';
     const rowsInj = hurt(rA, A) + hurt(rB, B);
@@ -393,7 +395,7 @@ async function overviewTab(body, A, B, lg) {
   onLeave(u1); onLeave(u2);
 }
 
-function storylines(A, B, da, db, lg, rA, rB) {
+export function storylines(A, B, da, db, lg, rA, rB) {
   const s = [];
   const streak = (d, t) => { const st = d.std?.streak; if (st && /([WL])(\d+)/.test(st)) { const [, k, n] = /([WL])(\d+)/.exec(st); if (+n >= 3) s.push(`<b>${esc(t.short || t.name)}</b> ${k === 'W' ? 'have won' : 'have lost'} ${n} straight.`); } };
   streak(da, A); streak(db, B);
