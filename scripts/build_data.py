@@ -335,6 +335,31 @@ def team_stats(key):
 
 
 def bpi(key):
+    """ESPN BPI for every team (fitt endpoint, all teams); falls back to the core API (top teams only)."""
+    lg = LG[key]
+    try:
+        js = fetch(f"https://site.web.api.espn.com/apis/fitt/v3/sports/basketball/{lg}/powerindex?limit=500")
+        names = {c["name"]: c.get("names") or [] for c in js.get("categories", [])}
+        out = {}
+        for t in js.get("teams", []):
+            tid = str((t.get("team") or {}).get("id"))
+            d = {}
+            for c in t.get("categories", []):
+                for n, v in zip(names.get(c.get("name"), []), c.get("values") or []):
+                    if n and (d.get(n) is None):
+                        d[n] = v
+            out[tid] = d
+        expected = (js.get("pagination") or {}).get("count") or 0
+        if out and len(out) >= 0.9 * expected:
+            save(f"{key}/bpi.json", {"updated": js.get("lastUpdated"), "teams": out, "source": "fitt"})
+            return
+        print("  fitt BPI incomplete", len(out), expected)
+    except Exception as e:  # noqa: BLE001
+        print("  fitt BPI failed", e)
+    bpi_core(key)
+
+
+def bpi_core(key):
     lg = LG[key]
     year = SEASONS[key]["year"]
     url = f"{CORE}/{lg}/seasons/{year}/powerindex?limit=25&page="
