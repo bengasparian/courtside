@@ -1,10 +1,10 @@
 // Player notes: load every player on a roster (progressively) and render full commentator cards.
-import { L, isPro, isCollege, draftLeague } from '../league.js?v=f76d549b88';
-import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js?v=f76d549b88';
-import { espn, repo, safe } from '../api.js?v=f76d549b88';
-import { state, myNotes, teams, seasonYear, paint, sayName } from '../ctx.js?v=f76d549b88';
-import { parseAthleteStats, currentSeason, advanced, playStyle, roleNotes, factNotes, parseGamelog, wikiPlayer, teamTotals, tsTier, usgTier, GLOSSARY } from '../notes.js?v=f76d549b88';
-import { q } from './common.js?v=f76d549b88';
+import { L, isPro, isCollege, draftLeague } from '../league.js?v=5b6412a517';
+import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js?v=5b6412a517';
+import { espn, repo, safe } from '../api.js?v=5b6412a517';
+import { state, myNotes, teams, seasonYear, paint, sayName } from '../ctx.js?v=5b6412a517';
+import { parseAthleteStats, currentSeason, advanced, playStyle, roleNotes, factNotes, parseGamelog, wikiPlayer, teamTotals, tsTier, usgTier, GLOSSARY } from '../notes.js?v=5b6412a517';
+import { q } from './common.js?v=5b6412a517';
 
 window.__csPlayers = window.__csPlayers || [];
 
@@ -68,7 +68,7 @@ async function enrich(p, ctx, onUpdate) {
   p.careerMisc = p.parsed?.careerMisc;
   p.adv = advanced(p.cur?.a, tm, lg);
   // previous season (for small early-season samples) and school path / transfers from ESPN season rows
-  const prevRows = (p.parsed?.seasons || []).filter(s => s.year < year && s.a?.gamesPlayed);
+  const prevRows = (p.parsed?.seasons || []).filter(s => s.year < year && s.a?.gamesPlayed && s.teamId && !/total/i.test(s.teamSlug || ''));
   p.prev = prevRows.sort((a, b) => b.year - a.year || (b.a.gamesPlayed - a.a.gamesPlayed))[0] || null;
   const TB = state._teamsById?.[lg] || {};
   if (p.prev && p.prev.teamId !== team.id) p.prevSchool = TB[p.prev.teamId]?.short || TB[p.prev.teamId]?.name || '';

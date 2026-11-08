@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js?v=f76d549b88';
-import { espn, repo, safe } from './api.js?v=f76d549b88';
-import { seasonYear } from './ctx.js?v=f76d549b88';
-import { loadRoster } from './views/players.js?v=f76d549b88';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=f76d549b88';
-import { num, normName } from './util.js?v=f76d549b88';
+import { L, isPro, isCollege } from './league.js?v=5b6412a517';
+import { espn, repo, safe } from './api.js?v=5b6412a517';
+import { seasonYear } from './ctx.js?v=5b6412a517';
+import { loadRoster } from './views/players.js?v=5b6412a517';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=5b6412a517';
+import { num, normName } from './util.js?v=5b6412a517';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
@@ -139,7 +139,7 @@ export function scheduleFacts(events, team, lg) {
   const done = events.filter(e => e.state === 'post' && e.us != null);
   const f = [];
   if (!done.length) return f;
-  const W = done.filter(e => e.win).length, L = done.length - W;
+  const W = done.filter(e => e.win).length, LOSSES = done.length - W;
   let cur = 0, curType = null;
   for (const e of [...done].reverse()) { if (curType === null) curType = e.win; if (e.win === curType) cur++; else break; }
   if (cur >= 3) f.push(`On a ${cur}-game ${curType ? 'winning' : 'losing'} streak.`);
@@ -167,7 +167,7 @@ export function scheduleFacts(events, team, lg) {
     const conf = done.filter(e => e.conf);
     if (conf.length) f.push(`${conf.filter(e => e.win).length}-${conf.filter(e => !e.win).length} in conference play.`);
   }
-  void W; void L; void team;
+  void W; void LOSSES; void team;
   return f;
 }
 

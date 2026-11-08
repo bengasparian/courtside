@@ -1,14 +1,14 @@
 // Matchup prep (two teams) and single-team pages.
-import { L, isPro, isCollege } from '../league.js?v=f76d549b88';
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=f76d549b88';
-import { espn, safe } from '../api.js?v=f76d549b88';
-import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=f76d549b88';
-import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=f76d549b88';
-import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=f76d549b88';
-import { kpi, q, newsList, rankCls } from './common.js?v=f76d549b88';
-import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=f76d549b88';
-import { onLeave } from '../app.js?v=f76d549b88';
-import { gamedayTab } from './gameday.js?v=f76d549b88';
+import { L, isPro, isCollege } from '../league.js?v=5b6412a517';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=5b6412a517';
+import { espn, safe } from '../api.js?v=5b6412a517';
+import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=5b6412a517';
+import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=5b6412a517';
+import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=5b6412a517';
+import { kpi, q, newsList, rankCls } from './common.js?v=5b6412a517';
+import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=5b6412a517';
+import { onLeave } from '../app.js?v=5b6412a517';
+import { gamedayTab } from './gameday.js?v=5b6412a517';
 
 // ------------------------------------------------------------------------------------------------ single team page
 export async function renderTeam(app, lg, id, params) {

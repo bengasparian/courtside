@@ -1,11 +1,11 @@
 // College hub: polls & rankings, conferences, March Madness projections, transfer portal, draft prospects.
-import { esc, f1, pct, ordinal, signed, logoFor, stars, ymd, fmtDate } from '../util.js?v=f76d549b88';
-import { espn, repo, safe } from '../api.js?v=f76d549b88';
-import { state, teams, seasonYear } from '../ctx.js?v=f76d549b88';
-import { newsList, teamCell, q, sortable } from './common.js?v=f76d549b88';
-import { draftView } from './nbahub.js?v=f76d549b88';
-import { netFor, netIsCurrent } from '../teamdata.js?v=f76d549b88';
-import { L, draftLeague } from '../league.js?v=f76d549b88';
+import { esc, f1, pct, ordinal, signed, logoFor, stars, ymd, fmtDate } from '../util.js?v=5b6412a517';
+import { espn, repo, safe } from '../api.js?v=5b6412a517';
+import { state, teams, seasonYear } from '../ctx.js?v=5b6412a517';
+import { newsList, teamCell, q, sortable } from './common.js?v=5b6412a517';
+import { draftView } from './nbahub.js?v=5b6412a517';
+import { netFor, netIsCurrent } from '../teamdata.js?v=5b6412a517';
+import { L, draftLeague } from '../league.js?v=5b6412a517';
 
 let T, CL = 'cbb';
 export async function render(app, view, params, lg = 'cbb') {
@@ -44,9 +44,9 @@ async function league(app, params) {
       ${(n?.rows || []).slice(0, 150).map(r => `<tr><td class="l b">${esc(r.Rank)}</td><td class="l">${byNet[r.Rank] ? teamCell(byNet[r.Rank], CL) : esc(r.School)}</td><td>${esc(r.Record)}</td><td class="small mut">${esc(r.Conf)}</td><td>${esc(r.Road)}</td><td>${esc(r.Neutral)}</td><td>${esc(r.Home)}</td><td class="b">${esc(r['Quad 1'])}</td><td>${esc(r['Quad 2'])}</td><td>${esc(r['Quad 3'])}</td><td>${esc(r['Quad 4'])}</td><td>${esc(r.Prev)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">NCAA Evaluation Tool via ncaa.com. ${q('net_rank', CL)}</div>`;
   } else if (tab === 'leaders') {
     const year = await seasonYear(CL);
-    const L = await safe(espn.leaders(CL, year), null);
-    const cats = L?.leaders?.categories || [];
-    el.innerHTML = cats.length ? `<div class="grid g3">${cats.slice(0, 12).map(c => `<div class="card flush"><div class="card-h"><h3 class="h3">${esc(c.displayName || c.name)}</h3></div><table class="t"><tbody>${(c.leaders || []).slice(0, 10).map((l, i) => { const tm = l.team || l.athlete?.team || {}; const t = T.byId[tm.id]; return `<tr><td class="l" style="width:20px">${i + 1}</td><td class="l"><span class="tm">${t ? `<img src="${esc(logoFor(t, state.theme))}" alt="">` : ''}${esc(l.athlete?.displayName || '')}</span></td><td class="b">${esc(l.displayValue)}</td></tr>`; }).join('')}</tbody></table></div>`).join('')}</div><div class="src">ESPN national statistical leaders. Every player's national rank is also on his card in the matchup view.</div>` : '<div class="empty">National leaders are not available right now. Each player\'s national ranks are on his player card.</div>';
+    const LD = await safe(espn.leaders(CL, year), null);
+    const cats = LD?.leaders?.categories || [];
+    el.innerHTML = cats.length ? `<div class="grid g3">${cats.slice(0, 12).map(c => `<div class="card flush"><div class="card-h"><h3 class="h3">${esc(c.displayName || c.name)}</h3></div><table class="t"><tbody>${(c.leaders || []).slice(0, 10).map((l, i) => { const tm = l.team || l.athlete?.team || {}; const t = T.byId[tm.id]; return `<tr><td class="l" style="width:20px">${i + 1}</td><td class="l"><span class="tm">${t ? `<img src="${esc(logoFor(t, state.theme))}" alt="">` : ''}${esc(l.athlete?.displayName || '')}</span></td><td class="b">${esc(l.displayValue)}</td></tr>`; }).join('')}</tbody></table></div>`).join('')}</div><div class="src">ESPN national statistical leaders. Every player's national rank is also on the player's card in the matchup view.</div>` : '<div class="empty">National leaders are not available right now. Each player\'s national ranks are on the player card.</div>';
   } else {
     const n = await safe(espn.news(CL, null, 30), null);
     el.innerHTML = `<div class="card">${newsList(n?.articles, { limit: 25 })}</div>`;

@@ -2,16 +2,16 @@
 // Sticky score bar (bonus / fouls / timeouts / last play), live panel (play-by-play, alerts, game flow),
 // pregame notes (storylines, edges, projection, last meeting), and both rosters side by side with the best note,
 // tonight's line, pronunciation, coach and roster changes. Quick notes open in place; the full card slides out.
-import { L, L as LG_, isPro, isCollege } from '../league.js?v=f76d549b88';
-import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=f76d549b88';
-import { espn, safe } from '../api.js?v=f76d549b88';
-import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=f76d549b88';
-import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=f76d549b88';
-import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=f76d549b88';
-import { q } from './common.js?v=f76d549b88';
-import { bodyHTML } from './players.js?v=f76d549b88';
-import { storylines } from './matchup.js?v=f76d549b88';
-import { onLeave, setKeys } from '../app.js?v=f76d549b88';
+import { L, L as LG_, isPro, isCollege } from '../league.js?v=5b6412a517';
+import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=5b6412a517';
+import { espn, safe } from '../api.js?v=5b6412a517';
+import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=5b6412a517';
+import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=5b6412a517';
+import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=5b6412a517';
+import { q } from './common.js?v=5b6412a517';
+import { bodyHTML } from './players.js?v=5b6412a517';
+import { storylines } from './matchup.js?v=5b6412a517';
+import { onLeave, setKeys } from '../app.js?v=5b6412a517';
 
 const pref = {
   get(k, d) { try { return localStorage.getItem('cs-gd-' + k) ?? d; } catch { return d; } },
@@ -135,7 +135,7 @@ export async function gamedayTab(body, A, B, lg) {
     const s = side[key];
     const addl = ch.additions.slice().sort((x, y) => (y.cur?.a?.avgMinutes || 0) - (x.cur?.a?.avgMinutes || 0)).slice(0, 8).map(p => {
       let from = '';
-      if (p.prev && p.prev.teamId !== s.team.id) from = `from ${T[p.prev.teamId]?.short || (p.prev.teamSlug || '').replace(/-/g, ' ') || 'elsewhere'}`;
+      if (p.prev && p.prev.teamId !== s.team.id) from = `from ${T[p.prev.teamId]?.short || (p.prev.teamSlug || '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'elsewhere'}`;
       else if (isCollege(lg) && !p.prev) from = p.recruit ? `freshman${p.recruit.stars ? ', ' + p.recruit.stars + '★' : ''}${p.recruit.rank ? ' #' + p.recruit.rank : ''}` : 'newcomer';
       else if (isPro(lg) && p.expYears === 0) from = `rookie${p.draft ? ', ' + p.draft.replace(/^\d{4}: /, '') : ''}`;
       else if (p.portal?.[0]?.from) from = `from ${p.portal[0].from}`;
@@ -145,7 +145,7 @@ export async function gamedayTab(body, A, B, lg) {
     }).join('');
     const outl = ch.departures.slice(0, 8).map(g => {
       const was = g.last ? `${f1(g.last.avgPoints)} ppg, ${f1(g.last.avgMinutes)} min last season` : 'little or no playing time';
-      const now = g.nowTeamId ? `now ${T[g.nowTeamId]?.short || 'elsewhere'}` : (isCollege(lg) ? 'left the program' : 'no longer on a roster');
+      const now = g.nowTeamId ? `now ${T[g.nowTeamId]?.short || 'elsewhere'}` : (isCollege(lg) ? 'left the program' : 'no games elsewhere this season');
       return `<li><b>${esc(g.name)}</b> <span class="mut">(${esc(was)}; ${esc(now)})</span></li>`;
     }).join('');
     return `<details class="gd-chg" ${showChanges ? 'open' : ''}><summary>Roster changes since last season <span class="mut">(+${ch.additions.length} / −${ch.departures.length})</span></summary>

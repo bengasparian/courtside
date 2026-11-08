@@ -1,9 +1,9 @@
 // Router, header (league switch, nav, live ticker, search, theme).
-import { L, isPro, isCollege, LEAGUES, LEAGUE_KEYS } from './league.js?v=f76d549b88';
-import { $, esc, debounce, logoFor, ymd, normName } from './util.js?v=f76d549b88';
-import { espn, safe, repo } from './api.js?v=f76d549b88';
-import { state, teams, unpaint, meta } from './ctx.js?v=f76d549b88';
-import { gameStatus, awayHome } from './views/common.js?v=f76d549b88';
+import { L, isPro, isCollege, LEAGUES, LEAGUE_KEYS } from './league.js?v=5b6412a517';
+import { $, esc, debounce, logoFor, ymd, normName } from './util.js?v=5b6412a517';
+import { espn, safe, repo } from './api.js?v=5b6412a517';
+import { state, teams, unpaint, meta } from './ctx.js?v=5b6412a517';
+import { gameStatus, awayHome } from './views/common.js?v=5b6412a517';
 
 const app = $('#app');
 let cleanup = [];
@@ -91,14 +91,14 @@ async function route() {
   app.innerHTML = '<div class="loading">Loading…</div>';
   window.scrollTo(0, 0);
   try {
-    if (view === '') (await import('./views/home.js?v=f76d549b88')).render(app, lg);
-    else if (view === 'matchup') (await import('./views/matchup.js?v=f76d549b88')).render(app, lg, parts[2], parts[3], parts[4] || 'gameday', params);
-    else if (view === 'team') (await import('./views/matchup.js?v=f76d549b88')).renderTeam(app, lg, parts[2], params);
-    else if (view === 'game') (await import('./views/game.js?v=f76d549b88')).render(app, lg, parts[2]);
-    else if (view === 'scores') (await import('./views/scores.js?v=f76d549b88')).render(app, lg, params);
-    else if (view === 'player') (await import('./views/players.js?v=f76d549b88')).renderPage(app, lg, parts[2], parts[3]);
-    else if (isPro(lg)) (await import('./views/nbahub.js?v=f76d549b88')).render(app, view, params, lg);
-    else (await import('./views/cbbhub.js?v=f76d549b88')).render(app, view, params, lg);
+    if (view === '') (await import('./views/home.js?v=5b6412a517')).render(app, lg);
+    else if (view === 'matchup') (await import('./views/matchup.js?v=5b6412a517')).render(app, lg, parts[2], parts[3], parts[4] || 'gameday', params);
+    else if (view === 'team') (await import('./views/matchup.js?v=5b6412a517')).renderTeam(app, lg, parts[2], params);
+    else if (view === 'game') (await import('./views/game.js?v=5b6412a517')).render(app, lg, parts[2]);
+    else if (view === 'scores') (await import('./views/scores.js?v=5b6412a517')).render(app, lg, params);
+    else if (view === 'player') (await import('./views/players.js?v=5b6412a517')).renderPage(app, lg, parts[2], parts[3]);
+    else if (isPro(lg)) (await import('./views/nbahub.js?v=5b6412a517')).render(app, view, params, lg);
+    else (await import('./views/cbbhub.js?v=5b6412a517')).render(app, view, params, lg);
   } catch (e) {
     console.error(e);
     app.innerHTML = `<div class="err">Something went wrong loading this page: ${esc(e.message || e)}. Try refreshing; data sources occasionally hiccup.</div>`;

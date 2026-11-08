@@ -1,10 +1,10 @@
 // Live box score / game preview.
-import { L } from '../league.js?v=f76d549b88';
-import { esc, logoFor, fmtDate, fmtTime, sparkline, num } from '../util.js?v=f76d549b88';
-import { espn, safe } from '../api.js?v=f76d549b88';
-import { state, teams, paint } from '../ctx.js?v=f76d549b88';
-import { onLeave } from '../app.js?v=f76d549b88';
-import { newsList } from './common.js?v=f76d549b88';
+import { L } from '../league.js?v=5b6412a517';
+import { esc, logoFor, fmtDate, fmtTime, sparkline, num } from '../util.js?v=5b6412a517';
+import { espn, safe } from '../api.js?v=5b6412a517';
+import { state, teams, paint } from '../ctx.js?v=5b6412a517';
+import { onLeave } from '../app.js?v=5b6412a517';
+import { newsList } from './common.js?v=5b6412a517';
 
 export async function render(app, lg, id) {
   const T = await teams(lg);
@@ -111,9 +111,9 @@ function teamCompare(s, away, home) {
 }
 
 function leaders(s) {
-  const L = s.leaders || [];
-  if (!L.length) return '';
-  return `<div class="card"><h3 class="h3">Leaders</h3>${L.map(t => `<div style="margin-bottom:8px"><div class="small b">${esc(t.team?.displayName || '')}</div>${(t.leaders || []).map(c => { const l = c.leaders?.[0]; return l ? `<div class="row small" style="padding:3px 0"><span class="mut" style="width:90px">${esc(c.displayName)}</span><img src="${esc(l.athlete?.headshot?.href || '')}" alt="" style="width:26px;height:20px;object-fit:cover;border-radius:4px" onerror="this.style.visibility='hidden'"><b>${esc(l.athlete?.displayName || '')}</b><span class="sp"></span><span>${esc(l.displayValue)}</span></div>` : ''; }).join('')}</div>`).join('')}</div>`;
+  const LD = s.leaders || [];
+  if (!LD.length) return '';
+  return `<div class="card"><h3 class="h3">Leaders</h3>${LD.map(t => `<div style="margin-bottom:8px"><div class="small b">${esc(t.team?.displayName || '')}</div>${(t.leaders || []).map(c => { const l = c.leaders?.[0]; return l ? `<div class="row small" style="padding:3px 0"><span class="mut" style="width:90px">${esc(c.displayName)}</span><img src="${esc(l.athlete?.headshot?.href || '')}" alt="" style="width:26px;height:20px;object-fit:cover;border-radius:4px" onerror="this.style.visibility='hidden'"><b>${esc(l.athlete?.displayName || '')}</b><span class="sp"></span><span>${esc(l.displayValue)}</span></div>` : ''; }).join('')}</div>`).join('')}</div>`;
 }
 
 function injuries(s) {

@@ -1,9 +1,9 @@
 // NBA league hub: season phase (Cup → All-Star → playoff race → playoffs), power rankings, standings, leaders, draft.
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, ymd } from '../util.js?v=f76d549b88';
-import { espn, repo, wiki, safe } from '../api.js?v=f76d549b88';
-import { state, teams, meta, seasonYear } from '../ctx.js?v=f76d549b88';
-import { gameCard, newsList, teamCell, q } from './common.js?v=f76d549b88';
-import { L, draftLeague } from '../league.js?v=f76d549b88';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, ymd } from '../util.js?v=5b6412a517';
+import { espn, repo, wiki, safe } from '../api.js?v=5b6412a517';
+import { state, teams, meta, seasonYear } from '../ctx.js?v=5b6412a517';
+import { gameCard, newsList, teamCell, q } from './common.js?v=5b6412a517';
+import { L, draftLeague } from '../league.js?v=5b6412a517';
 
 let T, PL = 'nba';
 export async function render(app, view, params, lg = 'nba') {
@@ -26,7 +26,7 @@ export async function render(app, view, params, lg = 'nba') {
 // ------------------------------------------------------------------ season phase
 async function phaseInfo() {
   const [m, cup, year] = await Promise.all([meta(), safe((PL === 'nba' ? repo(`${PL}/cup.json`) : Promise.resolve(null)), null), seasonYear(PL)]);
-  const types = m?.seasons?.nba?.types || [];
+  const types = m?.seasons?.[PL]?.types || [];
   const reg = types.find(t => t.id === '2'), post = types.find(t => t.id === '3');
   const W = PL === 'wnba';
   const regStart = reg?.start ? new Date(reg.start) : new Date(W ? `${year}-05-15` : `${year - 1}-10-20`);
