@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js?v=4e828d4caa';
-import { espn, repo, safe } from './api.js?v=4e828d4caa';
-import { seasonYear } from './ctx.js?v=4e828d4caa';
-import { loadRoster } from './views/players.js?v=4e828d4caa';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=4e828d4caa';
-import { num, normName } from './util.js?v=4e828d4caa';
+import { L, isPro, isCollege } from './league.js?v=f76d549b88';
+import { espn, repo, safe } from './api.js?v=f76d549b88';
+import { seasonYear } from './ctx.js?v=f76d549b88';
+import { loadRoster } from './views/players.js?v=f76d549b88';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=f76d549b88';
+import { num, normName } from './util.js?v=f76d549b88';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
@@ -224,27 +224,37 @@ export async function lastMeeting(lg, A, B, da, year) {
 }
 
 // ---------------------------------------------------------------- roster changes since last season
+// Last season's roster = everyone in three of last season's box scores (early, middle, final game).
+// A current player counts as new only if he isn't in those games AND his own stats don't show this team last season.
 const changeStore = new Map();
 export function rosterChanges(lg, team, players, year) {
   const key = lg + ':' + team.id;
   if (changeStore.has(key)) return changeStore.get(key);
   const p = (async () => {
-    const prev = await safe(espn.prevAthletes(lg, year - 1, team.id), null);
-    const prevIds = new Set((prev?.items || []).map(i => (/athletes\/(\d+)/.exec(i.$ref || '') || [])[1]).filter(Boolean));
-    if (!prevIds.size) return null;
-    const curIds = new Set(players.map(p => p.id));
-    const additions = players.filter(p => !prevIds.has(p.id));
-    const goneIds = [...prevIds].filter(id => !curIds.has(id)).slice(0, 18);
+    const sc = await safe(espn.schedule(lg, team.id, year - 1, 2), null);
+    const done = (sc?.events || []).map(e => simplifyEvent(e, team.id)).filter(e => e && e.state === 'post').sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (done.length < 3) return null;
+    const picks = [...new Set([Math.floor(done.length / 4), Math.floor(done.length * 0.6), done.length - 1])].map(i => done[i]);
+    const sums = await Promise.all(picks.map(e => safe(espn.summary(lg, e.id, 86400), null)));
+    const prev = new Map();
+    for (const s of sums) {
+      for (const tp of s?.boxscore?.players || []) {
+        if (tp.team?.id !== team.id) continue;
+        for (const r of tp.statistics?.[0]?.athletes || []) prev.set(r.athlete.id, r.athlete.displayName);
+      }
+    }
+    if (!prev.size) return null;
+    const cur = new Set(players.map(x => x.id));
+    const additions = players.filter(x => !prev.has(x.id) && x.prev?.teamId !== team.id);
+    const goneIds = [...prev.keys()].filter(id => !cur.has(id)).slice(0, 16);
     const gone = await Promise.all(goneIds.map(async id => {
-      const [ath, st] = await Promise.all([safe(espn.coreAthlete(lg, id), null), safe(espn.athleteStats(lg, id), null)]);
-      const parsed = parseAthleteStats(st);
-      const last = (parsed?.seasons || []).filter(r => r.year === year - 1).sort((a, b) => (b.a.gamesPlayed || 0) - (a.a.gamesPlayed || 0))[0];
+      const parsed = parseAthleteStats(await safe(espn.athleteStats(lg, id), null));
+      const last = (parsed?.seasons || []).filter(r => r.year === year - 1 && r.teamId === team.id)[0] || (parsed?.seasons || []).filter(r => r.year === year - 1)[0];
       const now = (parsed?.seasons || []).find(r => r.year === year && r.teamId !== team.id);
-      const tref = /seasons\/(\d+)\/teams\/(\d+)/.exec(ath?.team?.$ref || '');
-      return { id, name: ath?.displayName || ath?.fullName || '', last: last?.a || null, nowTeamId: now?.teamId || (tref && +tref[1] === year && tref[2] !== team.id ? tref[2] : null) };
+      return { id, name: prev.get(id), last: last?.a || null, nowTeamId: now?.teamId || null };
     }));
-    gone.sort((a, b) => ((b.last?.avgMinutes || 0) - (a.last?.avgMinutes || 0)));
-    return { additions, departures: gone.filter(g => g.name) };
+    gone.sort((a, b) => (b.last?.avgMinutes || 0) - (a.last?.avgMinutes || 0));
+    return { additions, departures: gone };
   })();
   changeStore.set(key, p);
   return p;

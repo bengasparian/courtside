@@ -1,8 +1,8 @@
 // Turns raw ESPN / Wikipedia / data-branch numbers into commentator notes:
 // advanced stats (with what they mean), play style, role, background and talking points.
-import { L, isPro, isCollege, scope, gender } from './league.js?v=4e828d4caa';
-import { num, f1, pct, ordinal, normName } from './util.js?v=4e828d4caa';
-import { wiki, safe } from './api.js?v=4e828d4caa';
+import { L, isPro, isCollege, scope, gender } from './league.js?v=f76d549b88';
+import { num, f1, pct, ordinal, normName } from './util.js?v=f76d549b88';
+import { wiki, safe } from './api.js?v=f76d549b88';
 
 // ---------------------------------------------------------------- glossary (shown next to every advanced stat)
 export const GLOSSARY = {

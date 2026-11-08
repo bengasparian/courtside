@@ -2,16 +2,16 @@
 // Sticky score bar (bonus / fouls / timeouts / last play), live panel (play-by-play, alerts, game flow),
 // pregame notes (storylines, edges, projection, last meeting), and both rosters side by side with the best note,
 // tonight's line, pronunciation, coach and roster changes. Quick notes open in place; the full card slides out.
-import { L, L as LG_, isPro, isCollege } from '../league.js?v=4e828d4caa';
-import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=4e828d4caa';
-import { espn, safe } from '../api.js?v=4e828d4caa';
-import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=4e828d4caa';
-import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=4e828d4caa';
-import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=4e828d4caa';
-import { q } from './common.js?v=4e828d4caa';
-import { bodyHTML } from './players.js?v=4e828d4caa';
-import { storylines } from './matchup.js?v=4e828d4caa';
-import { onLeave, setKeys } from '../app.js?v=4e828d4caa';
+import { L, L as LG_, isPro, isCollege } from '../league.js?v=f76d549b88';
+import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js?v=f76d549b88';
+import { espn, safe } from '../api.js?v=f76d549b88';
+import { state, myNotes, teams, pron, sayName } from '../ctx.js?v=f76d549b88';
+import { teamData, roster, coachProfile, lastMeeting, rosterChanges } from '../teamdata.js?v=f76d549b88';
+import { playStyle, roleNotes, factNotes, teamStyle } from '../notes.js?v=f76d549b88';
+import { q } from './common.js?v=f76d549b88';
+import { bodyHTML } from './players.js?v=f76d549b88';
+import { storylines } from './matchup.js?v=f76d549b88';
+import { onLeave, setKeys } from '../app.js?v=f76d549b88';
 
 const pref = {
   get(k, d) { try { return localStorage.getItem('cs-gd-' + k) ?? d; } catch { return d; } },
@@ -121,7 +121,7 @@ export async function gamedayTab(body, A, B, lg) {
     const rc = side[key].r.coach;
     if (!rc) return '';
     if (!c) return `<div class="gd-coach"><b>Coach ${esc(rc.firstName)} ${esc(rc.lastName)}</b></div>`;
-    const bits = [c.season ? `${c.season} this season` : '', c.career ? `${c.career} career` : (c.wiki?.overall ? `${c.wiki.overall} overall` : ''), c.seasons ? `${c.seasons} seasons as head coach` : (c.exp ? `${c.exp} yrs` : '')].filter(Boolean);
+    const bits = [c.season ? `${c.season} this season` : '', c.career ? `${c.career} career` : (c.wiki?.overall ? `${c.wiki.overall} overall` : ''), c.exp ? `${c.exp} yr${c.exp === 1 ? '' : 's'} with team` : ''].filter(Boolean);
     const say = c.wiki?.pron ? ` <span class="gd-say">🔊 ${esc(c.wiki.pron)}</span>` : '';
     const more = [c.wiki?.extract ? esc(c.wiki.extract) : '', c.wiki?.highlights?.length ? `<b>Highlights:</b> ${c.wiki.highlights.slice(0, 6).map(esc).join(' · ')}` : '', c.born ? `Born ${esc(c.born)}${c.age ? ` (age ${c.age})` : ''}` : ''].filter(Boolean);
     return `<details class="gd-coach"><summary><b>Coach ${esc(c.name)}</b>${say}${bits.length ? ` · <span class="mut">${esc(bits.join(' · '))}</span>` : ''}</summary>${more.length ? `<div class="small" style="margin-top:4px">${more.join('<br>')}${c.wiki?.url ? ` <a class="link" href="${esc(c.wiki.url)}" target="_blank" rel="noopener">Wikipedia</a>` : ''}</div>` : '<div class="small mut">No additional background found.</div>'}</details>`;
