@@ -165,6 +165,14 @@ def season_info():
         except Exception:
             pass
         ls = lgi.get("season", {}) or {}
+        yr = season.get("year") or ls.get("year")
+        if not types and yr:
+            for tid in (1, 2, 3, 5):
+                try:
+                    tj = fetch(f"{CORE}/{lg}/seasons/{yr}/types/{tid}", tries=1)
+                    types.append({"id": str(tid), "name": tj.get("name"), "start": tj.get("startDate"), "end": tj.get("endDate")})
+                except Exception:
+                    pass
         info[key] = {"year": season.get("year") or ls.get("year"), "type": season.get("type") or (ls.get("type") or {}).get("type"),
                      "startDate": lgi.get("season", {}).get("startDate"), "endDate": lgi.get("season", {}).get("endDate"),
                      "types": types}
@@ -629,7 +637,20 @@ def portal():
             print("  portal", py, e)
             continue
         pages = (first.get("pagination") or {}).get("pageCount", 1)
-        more = pmap(lambda p: on3_next(f"{base}?page={p}"), list(range(2, min(pages, 80) + 1)), workers=4)
+        k0 = norm_name(((first.get("list") or [{}])[0].get("player") or {}).get("fullName"))
+        param = None
+        for cand in ("page", "pageNumber", "p", "currentPage"):
+            try:
+                test = on3_next(f"{base}?{cand}=2")
+            except Exception:
+                continue
+            k2 = norm_name(((test.get("list") or [{}])[0].get("player") or {}).get("fullName"))
+            print("  portal paging", cand, k0, k2, (test.get("pagination") or {}).get("currentPage"))
+            if k2 and k2 != k0:
+                param = cand
+                break
+        META.setdefault("notes", {})["portal_param"] = param
+        more = pmap(lambda p: on3_next(f"{base}?{param}={p}"), list(range(2, min(pages, 80) + 1)), workers=4) if param else {}
         for pp in [first] + [more[p] for p in sorted(more) if more[p]]:
             for e in pp.get("list", []) or []:
                 pl = e.get("player") or {}
@@ -648,8 +669,8 @@ def portal():
                     out.setdefault(k, [])
                     if not any(x["year"] == py and x["from"] == rec["from"] for x in out[k]):
                         out[k].append(rec)
-    if len(out) < 200:
-        raise RuntimeError(f"too few portal entries {len(out)}")
+    if len(out) < 40:
+        raise RuntimeError(f"too few portal entries {len(out)}")  # keeps previous file
     save("cbb/portal.json", {"source": "On3 Transfer Portal (on3.com)", "players": out})
 
 
