@@ -381,7 +381,7 @@ async function overviewTab(body, A, B, lg) {
     const keyp = body.querySelector('#keyp'), inj = body.querySelector('#injboth'), story = body.querySelector('#story');
     if (!keyp) return;
     const top = (ros) => ros.players.filter(p => p.cur?.a?.gamesPlayed).sort((x, y) => (y.cur.a.avgPoints + y.cur.a.avgRebounds * .5 + y.cur.a.avgAssists * .7) - (x.cur.a.avgPoints + x.cur.a.avgRebounds * .5 + x.cur.a.avgAssists * .7)).slice(0, 3);
-    const pl = (p, team, side) => `<a class="row" href="${location.hash.replace(/\/[^/]+$/, '/' + side + '-players')}" style="padding:6px 0;border-bottom:1px solid var(--line2)"><img src="${esc(p.headshot || '')}" alt="" style="width:52px;height:38px;object-fit:cover;object-position:top;border-radius:6px;background:var(--chip)" onerror="this.style.visibility='hidden'"><div style="min-width:0"><div class="b">${esc(p.name)} <span class="mut small">#${esc(p.jersey ?? '')} ${esc(p.pos || '')}</span></div><div class="small mut">${f1(p.cur.a.avgPoints)} pts · ${f1(p.cur.a.avgRebounds)} reb · ${f1(p.cur.a.avgAssists)} ast${p.adv?.ts ? ` · ${f1(p.adv.ts)} TS%` : ''}</div><div class="small">${esc(playStyle(p, lg)[0] || '')}</div></div></a>`;
+    const pl = (p, team, side) => `<a class="row" href="${location.hash.replace(/\/[^/]+$/, '/' + side + '-players')}" style="padding:6px 0;border-bottom:1px solid var(--line2)"><img src="${esc(p.headshot || '')}" alt="" style="width:52px;height:38px;object-fit:cover;object-position:top;border-radius:6px;background:var(--chip)" onerror="this.style.visibility='hidden'"><div style="min-width:0"><div class="b">${esc(p.name)} <span class="mut small">#${esc(p.jersey ?? '')} ${esc(p.pos || '')}</span></div><div class="small mut">${f1(p.cur.a.avgPoints)} pts · ${f1(p.cur.a.avgRebounds)} reb · ${f1(p.cur.a.avgAssists)} ast${p.adv?.ts ? ` · ${f1(p.adv.ts)} TS%` : ''}</div><div class="small">${esc(playStyle(p, lg).filter(x => !x.startsWith('('))[0] || '')}</div></div></a>`;
     keyp.innerHTML = `<h3 class="h3">Players to watch</h3><div class="grid g2" style="gap:12px"><div><div class="small b" style="color:var(--a-txt)">${esc(A.name)}</div>${rA.ready ? top(rA).map(p => pl(p, A, 'a')).join('') || '<div class="small mut">No stats yet.</div>' : '<div class="loading"></div>'}</div><div><div class="small b" style="color:var(--b-txt)">${esc(B.name)}</div>${rB.ready ? top(rB).map(p => pl(p, B, 'b')).join('') || '<div class="small mut">No stats yet.</div>' : '<div class="loading"></div>'}</div></div>`;
     const hurt = (ros, t) => ros.ready ? (ros.players.filter(p => p.injury).map(p => `<tr><td>${esc(t.abbr)}</td><td class="l">${esc(p.name)}</td><td class="inj" style="white-space:normal;text-align:left">${esc(p.injury)}</td></tr>`).join('')) : '';
     const rowsInj = hurt(rA, A) + hurt(rB, B);
@@ -436,7 +436,7 @@ function boardTab(body, A, B, lg) {
   const draw = async () => {
     const [da, db] = await Promise.all([teamData(lg, A), teamData(lg, B)]);
     const side = (t, d, ros, cls) => {
-      const players = ros.players.slice().sort((x, y) => (+x.jersey || 0) - (+y.jersey || 0));
+      const players = ros.players.slice().sort((x, y) => (x.jersey === undefined || x.jersey === '' ? 999 : +x.jersey) - (y.jersey === undefined || y.jersey === '' ? 999 : +y.jersey));
       const std = d.std;
       const head = lg === 'nba' ? [std?.overall, std?.seed ? ordinal(std.seed) + ' ' + std.confAbbr : '', std?.streak, d.power ? 'PR #' + d.power.rank : ''] : [std?.overall, std ? `${std.conf} ${shortConf(std.confName)}` : '', d.polls?.find(p => /AP/.test(p.name)) ? 'AP #' + d.polls.find(p => /AP/.test(p.name)).rank.current : '', d.bpi?.bpirank ? 'BPI #' + d.bpi.bpirank : ''];
       const r = d.ranks;
@@ -446,7 +446,8 @@ function boardTab(body, A, B, lg) {
           const a = p.cur?.a;
           const line = a ? `${f1(a.avgPoints)}p ${f1(a.avgRebounds)}r ${f1(a.avgAssists)}a · ${f1(a.fieldGoalPct)} FG · ${f1(a.threePointFieldGoalPct ?? a.threePointPct)} 3P · ${f1(a.avgMinutes)} min` : 'No stats this season';
           const bits = [p.posName || p.pos, p.ht, lg === 'cbb' ? p.exp : (p.expStr || p.exp), p.recruit?.hs || p.wiki?.hs || '', lg === 'nba' ? (p.college || '') : (p.birthPlace || '')].filter(Boolean);
-          const note = [roleNotes(p, ros.players, lg)[0], playStyle(p, lg)[1] || playStyle(p, lg)[0], factNotes(p, ros.players, lg, { wiki: p.wiki })[0]].filter(Boolean).slice(0, 2).join(' ');
+          const ps = playStyle(p, lg).filter(x => !x.startsWith('('));
+          const note = [ps[0], ps[1], factNotes(p, ros.players, lg, { wiki: p.wiki })[0], roleNotes(p, ros.players, lg)[0]].filter(Boolean).slice(0, 2).join(' ');
           const extra = [p.injury ? `⚕ ${p.injury}` : '', p.recruit?.stars ? `${stars(p.recruit.stars)} #${p.recruit.rank || '–'} (${p.recruit.cls})` : '', (p.portal?.[0]?.from || p.transferFrom) ? `Transfer: ${p.portal?.[0]?.from || p.transferFrom}` : '', p.mock ? `Mock #${p.mock.pick}` : ''].filter(Boolean).join(' · ');
           const my = myNotes.get(`${lg}:${p.id}`);
           return `<div class="pl"><div class="n">${esc(p.jersey ?? '')}</div><div><div class="nm">${esc(p.name)} <span class="mut" style="font-weight:500">${esc(bits.join(' · '))}</span></div><div class="ln">${esc(line)}${extra ? ' · ' + esc(extra) : ''}</div></div><div class="nt">${esc(note)}${my ? ` <b>✎ ${esc(my)}</b>` : ''}</div></div>`;

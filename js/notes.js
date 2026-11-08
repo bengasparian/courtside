@@ -318,7 +318,7 @@ function cleanWiki(s) {
   for (let i = 0; i < 4; i++) t = t.replace(/\{\{\s*(?:small|nowrap|nobr|lang\|[a-z]+|abbr|sortname|flagicon[^|]*)\s*\|([^{}|]*)(?:\|[^{}]*)?\}\}/gi, '$1');
   t = t.replace(/\{\{[^{}]*\}\}/g, '').replace(/\{\{[^{}]*\}\}/g, '');
   t = t.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/'''?/g, '').replace(/<br\s*\/?>/gi, '; ').replace(/<[^>]+>/g, '');
-  t = t.replace(/&nbsp;/g, ' ').replace(/[{}]+/g, '').replace(/\s+/g, ' ').replace(/(\d)([A-Z][A-Za-z]+:)/g, '$1; $2').trim();
+  t = t.replace(/&nbsp;/g, ' ').replace(/[{}]+/g, '').replace(/\s+/g, ' ').replace(/(\d)([A-Z][A-Za-z]+:)/g, '$1; $2').replace(/;\s*\(/g, ' (').trim();
   return t;
 }
 function infobox(text) {
