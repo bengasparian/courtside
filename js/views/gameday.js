@@ -139,7 +139,7 @@ export async function gamedayTab(body, A, B, lg) {
   };
 
   const quick = (p, ros) => {
-    const style = playStyle(p, lg).filter(x => !x.startsWith('(')).slice(0, 3);
+    const style = playStyle(p, lg).filter(x => !x.startsWith('(')).slice(0, 7);
     const role = roleNotes(p, ros, lg).slice(0, 2);
     const facts = factNotes(p, ros, lg, { wiki: p.wiki }).slice(0, 6);
     const bg = [];
