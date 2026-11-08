@@ -27,7 +27,9 @@ SITE = "https://site.api.espn.com/apis/site/v2/sports/basketball"
 SITEV2 = "https://site.api.espn.com/apis/v2/sports/basketball"
 CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues"
 WEB3 = "https://site.web.api.espn.com/apis/site/v3/sports/basketball"
-LG = {"nba": "nba", "cbb": "mens-college-basketball"}
+LG = {"nba": "nba", "wnba": "wnba", "cbb": "mens-college-basketball", "wcbb": "womens-college-basketball"}
+PRO = ("nba", "wnba")
+COLLEGE = ("cbb", "wcbb")
 NOW = dt.datetime.now(dt.timezone.utc)
 META_PATH = os.path.join(OUT, "meta.json")
 META = {}
@@ -183,8 +185,8 @@ SEASONS = {}
 
 
 # --------------------------------------------------------------------------------------------------------- NBA tasks
-def nba_teams():
-    js = fetch(f"{SITE}/nba/teams")
+def pro_teams(key):
+    js = fetch(f"{SITE}/{LG[key]}/teams")
     teams = []
     for t in js["sports"][0]["leagues"][0]["teams"]:
         t = t["team"]
@@ -202,18 +204,19 @@ def nba_teams():
                 div[tid] = path[1]
         for c in node.get("children", []) or []:
             walk(c, path + [c.get("abbreviation") if not path else c.get("name")])
-    walk(fetch(f"{SITEV2}/nba/standings"), [])
+    walk(fetch(f"{SITEV2}/{LG[key]}/standings"), [])
     try:
-        walk(fetch(f"{SITEV2}/nba/standings?level=3"), [])
+        if key == "nba":
+            walk(fetch(f"{SITEV2}/nba/standings?level=3"), [])
     except Exception as e:  # noqa: BLE001
         print("  division standings failed", e)
-    details = pmap(lambda tid: fetch(f"{SITE}/nba/teams/{tid}"), [t["id"] for t in teams])
+    details = pmap(lambda tid: fetch(f"{SITE}/{LG[key]}/teams/{tid}"), [t["id"] for t in teams])
     for t in teams:
         t["conf"] = conf.get(t["id"])
         t["division"] = div.get(t["id"])
         d = (details.get(t["id"]) or {}).get("team", {})
         t["standingSummary"] = d.get("standingSummary")
-    save("nba/teams.json", teams)
+    save(f"{key}/teams.json", teams)
 
 
 def standings_map(lg):
@@ -290,13 +293,10 @@ ASC = ["oppg", "drtg", "tpg", "tovPct"]
 def team_stats(key):
     lg = LG[key]
     stmap, _ = standings_map(lg)
-    if key == "nba":
-        ids = [t["id"] for t in load("nba/teams.json", [])]
-    else:
-        ids = [t["id"] for t in load("cbb/teams.json", [])]
+    ids = [t["id"] for t in load(f"{key}/teams.json", [])]
     raw = pmap(lambda tid: fetch(f"{SITE}/{lg}/teams/{tid}/statistics"), ids, workers=10)
     opp = {}
-    if key == "cbb":
+    if key in COLLEGE:
         scheds = pmap(lambda tid: fetch(f"{SITE}/{lg}/teams/{tid}/schedule"), ids, workers=10)
         for tid, js in scheds.items():
             pts, n = 0, 0
@@ -391,12 +391,12 @@ def bpi_core(key):
     return {"updated": (first.get("items") or [{}])[0].get("lastUpdated"), "teams": out}
 
 
-def nba_power():
+def power(key):
     """Courtside power rankings: blend of ESPN BPI, net rating, win% and last-10 form. Keeps daily snapshots."""
-    teams = load("nba/teams.json", [])
-    b = (load("nba/bpi.json", {}) or {}).get("teams", {})
-    ts = (load("nba/teamstats.json", {}) or {}).get("teams", {})
-    stmap, _ = standings_map("nba")
+    teams = load(f"{key}/teams.json", [])
+    b = (load(f"{key}/bpi.json", {}) or {}).get("teams", {})
+    ts = (load(f"{key}/teamstats.json", {}) or {}).get("teams", {})
+    stmap, _ = standings_map(LG[key])
     rows = []
     for t in teams:
         tid = t["id"]
@@ -426,7 +426,7 @@ def nba_power():
     rows.sort(key=lambda r: -r["score"])
     for i, r in enumerate(rows, 1):
         r["rank"] = i
-    prev = load("nba/power.json", {}) or {}
+    prev = load(f"{key}/power.json", {}) or {}
     snaps = prev.get("snapshots", {})
     today = NOW.strftime("%Y-%m-%d")
     snaps[today] = {r["id"]: r["rank"] for r in rows}
@@ -436,12 +436,12 @@ def nba_power():
     base = snaps[week_ago[-1]] if week_ago else snaps[keep[0]]
     for r in rows:
         r["prev"] = base.get(r["id"])
-    save("nba/power.json", {"date": today, "baseDate": week_ago[-1] if week_ago else keep[0], "rows": rows, "snapshots": snaps})
+    save(f"{key}/power.json", {"date": today, "baseDate": week_ago[-1] if week_ago else keep[0], "rows": rows, "snapshots": snaps})
 
 
-def nba_leaders():
-    year = SEASONS["nba"]["year"]
-    js = fetch(f"{WEB3}/nba/leaders?season={year}&seasontype=2")
+def leaders(key):
+    year = SEASONS[key]["year"]
+    js = fetch(f"{WEB3}/{LG[key]}/leaders?season={year}&seasontype=2")
     cats = {}
     per = {}
     for c in js.get("leaders", {}).get("categories", []):
@@ -456,7 +456,9 @@ def nba_leaders():
             if c.get("name") == "PER":
                 per[a.get("id")] = {"per": l.get("value"), "rank": i}
         cats[c.get("name")] = {"label": c.get("displayName") or c.get("name"), "leaders": lst}
-    save("nba/leaders.json", {"categories": cats, "per": per})
+    if not cats:
+        raise RuntimeError("no leader categories")
+    save(f"{key}/leaders.json", {"categories": cats, "per": per})
 
 
 def nba_cup():
@@ -582,19 +584,25 @@ def parse_tankathon(h, mock):
     return rows
 
 
-def draft():
-    mock = parse_tankathon(fetch("https://www.tankathon.com/mock_draft", "text"), True)
-    board = parse_tankathon(fetch("https://www.tankathon.com/big_board", "text"), False)
-    if len(mock) < 30 or len(board) < 30:
+def draft(league="nba"):
+    base = "https://www.tankathon.com" + ("" if league == "nba" else "/wnba")
+    mock = parse_tankathon(fetch(f"{base}/mock_draft", "text"), True)
+    try:
+        board = parse_tankathon(fetch(f"{base}/big_board", "text"), False)
+    except Exception as e:  # noqa: BLE001
+        print("  big board failed", e)
+        board = []
+    need = 30 if league == "nba" else 12
+    if len(mock) < need:
         raise RuntimeError(f"tankathon parse too small {len(mock)} {len(board)}")
-    save("draft.json", {"source": "Tankathon (tankathon.com)", "mock": mock, "board": board})
+    save("draft.json" if league == "nba" else "wnba/draft.json", {"source": "Tankathon (tankathon.com)", "mock": mock, "board": board})
 
 
 # --------------------------------------------------------------------------------------------------------- CBB tasks
-def cbb_teams():
+def college_teams(key):
     """All Division I teams (ESPN team list) with conference membership from the full standings."""
-    tl = fetch(f"{SITE}/mens-college-basketball/teams?limit=1000")
-    stmap, _ = standings_map("mens-college-basketball")
+    tl = fetch(f"{SITE}/{LG[key]}/teams?limit=1000")
+    stmap, _ = standings_map(LG[key])
     teams = []
     confs = {}
     for t in tl["sports"][0]["leagues"][0]["teams"]:
@@ -609,8 +617,8 @@ def cbb_teams():
                       "logo": logo_of(t), "logoDark": dark_logo_of(t), "conf": conf, "confAbbr": st.get("confAbbr"), "slug": t.get("slug")})
     if len(teams) < 300:
         raise RuntimeError(f"too few cbb teams {len(teams)}")
-    save("cbb/teams.json", teams)
-    save("cbb/conferences.json", sorted(confs.values(), key=lambda c: c["name"]))
+    save(f"{key}/teams.json", teams)
+    save(f"{key}/conferences.json", sorted(confs.values(), key=lambda c: c["name"]))
 
 
 def wl(rec):
@@ -618,8 +626,8 @@ def wl(rec):
     return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
 
-def cbb_standings():
-    stmap, raw = standings_map("mens-college-basketball")
+def college_standings(key):
+    stmap, raw = standings_map(LG[key])
     confs = {}
     for tid, s in stmap.items():
         v, d = s["v"], s["d"]
@@ -636,14 +644,15 @@ def cbb_standings():
         lst.sort(key=lambda r: (-(r["cwp"] if r["cwp"] is not None else -1), -r["cw"], r["cl"], -(r["wp"] or 0), -r["w"]))
         for i, r in enumerate(lst, 1):
             r["confRank"] = i
-    save("cbb/standings.json", confs)
+    save(f"{key}/standings.json", confs)
 
 
-def cbb_net():
-    js = fetch("https://ncaa-api.henrygd.me/rankings/basketball-men/d1/ncaa-mens-basketball-net-rankings")
+def net(key):
+    path = "basketball-men/d1/ncaa-mens-basketball-net-rankings" if key == "cbb" else "basketball-women/d1/ncaa-womens-basketball-net-rankings"
+    js = fetch(f"https://ncaa-api.henrygd.me/rankings/{path}")
     if not js.get("data"):
         raise RuntimeError("no NET data")
-    save("cbb/net.json", {"updated": js.get("updated"), "rows": js["data"]})
+    save(f"{key}/net.json", {"updated": js.get("updated"), "rows": js["data"]})
 
 
 def on3_next(url):
@@ -654,15 +663,23 @@ def on3_next(url):
     return json.loads(m.group(1))["props"]["pageProps"]
 
 
-def recruits():
-    year = int(SEASONS["cbb"]["year"])
+def recruits(key="cbb"):
+    year = int(SEASONS[key]["year"])
+    slugs = ["basketball"] if key == "cbb" else ["womens-basketball", "wbasketball", "basketball-women"]
     out = {}
     for cls in range(year - 6, year + 1):
-        base = f"https://www.on3.com/rivals/rankings/industry-player/basketball/{cls}/"
-        try:
-            first = on3_next(base)
-        except Exception as e:  # noqa: BLE001
-            print("  recruits", cls, e)
+        first = None
+        for slug in slugs:
+            base = f"https://www.on3.com/rivals/rankings/industry-player/{slug}/{cls}/"
+            try:
+                first = on3_next(base)
+                if (first.get("playerData") or {}).get("list"):
+                    break
+                first = None
+            except Exception as e:  # noqa: BLE001
+                print("  recruits", key, slug, cls, e)
+                first = None
+        if not first:
             continue
         pages = ((first.get("playerData") or {}).get("pagination") or {}).get("pageCount", 1)
         lists = [first]
@@ -682,16 +699,26 @@ def recruits():
                 k = norm_name(rec["name"])
                 if k and (k not in out or (out[k].get("cls") or 0) < rec["cls"]):
                     out[k] = rec
-    if len(out) < 300:
+    if len(out) < (300 if key == "cbb" else 50):
         raise RuntimeError(f"too few recruits {len(out)}")
-    save("cbb/recruits.json", {"source": "On3 Industry Ranking (on3.com)", "players": out})
+    save(f"{key}/recruits.json", {"source": "On3 Industry Ranking (on3.com)", "players": out})
 
 
-def portal():
-    year = int(SEASONS["cbb"]["year"])
+def portal(key="cbb"):
+    year = int(SEASONS[key]["year"])
     out = {}
-    root = "https://www.on3.com/transfer-portal/wire/basketball/"
-    cur = on3_next(root)
+    cur, root = None, None
+    for slug in (["basketball"] if key == "cbb" else ["womens-basketball", "wbasketball", "basketball-women"]):
+        root = f"https://www.on3.com/transfer-portal/wire/{slug}/"
+        try:
+            cur = on3_next(root)
+            if cur.get("list"):
+                break
+        except Exception as e:  # noqa: BLE001
+            print("  portal", key, slug, e)
+        cur = None
+    if not cur:
+        raise RuntimeError("no portal page")
     cur_year = int(cur.get("selectedYear") or year - 1)
     for py in sorted({cur_year - 1, cur_year}):
         base = root if py == cur_year else f"{root}{py}/"
@@ -738,7 +765,7 @@ def portal():
                         out[k].append(rec)
     if len(out) < 40:
         raise RuntimeError(f"too few portal entries {len(out)}")  # keeps previous file
-    save("cbb/portal.json", {"source": "On3 Transfer Portal (on3.com)", "players": out})
+    save(f"{key}/portal.json", {"source": "On3 Transfer Portal (on3.com)", "players": out})
 
 
 def news_digest():
@@ -756,20 +783,27 @@ def main():
     global SEASONS
     SEASONS = season_info()
     META["seasons"] = SEASONS
-    run("nba_teams", 20, nba_teams)
-    run("cbb_teams", 20, cbb_teams)
-    run("nba_teamstats", 1, lambda: team_stats("nba"))
-    run("nba_bpi", 1, lambda: bpi("nba"))
-    run("nba_power", 1, nba_power)
-    run("nba_leaders", 1, nba_leaders)
+    for k in PRO:
+        run(f"{k}_teams", 20, lambda k=k: pro_teams(k))
+    for k in COLLEGE:
+        run(f"{k}_teams", 20, lambda k=k: college_teams(k))
+    for k in PRO:
+        run(f"{k}_teamstats", 1 if k == "nba" else 3, lambda k=k: team_stats(k))
+        run(f"{k}_bpi", 1 if k == "nba" else 3, lambda k=k: bpi(k))
+        run(f"{k}_power", 1 if k == "nba" else 3, lambda k=k: power(k))
+        run(f"{k}_leaders", 1 if k == "nba" else 3, lambda k=k: leaders(k))
     run("nba_cup", 1, nba_cup)
-    run("cbb_standings", 1, cbb_standings)
-    run("cbb_bpi", 1, lambda: bpi("cbb"))
-    run("cbb_teamstats", 5, lambda: team_stats("cbb"))
-    run("cbb_net", 5, cbb_net)
-    run("draft", 11, draft)
-    run("portal", 11, portal)
-    run("recruits", 70, recruits)
+    for k in COLLEGE:
+        run(f"{k}_standings", 1, lambda k=k: college_standings(k))
+        run(f"{k}_bpi", 1, lambda k=k: bpi(k))
+        run(f"{k}_teamstats", 5, lambda k=k: team_stats(k))
+        run(f"{k}_net", 5, lambda k=k: net(k))
+    run("draft", 11, lambda: draft("nba"))
+    run("wnba_draft", 11, lambda: draft("wnba"))
+    run("portal", 11, lambda: portal("cbb"))
+    run("recruits", 70, lambda: recruits("cbb"))
+    run("wcbb_portal", 23, lambda: portal("wcbb"))
+    run("wcbb_recruits", 70, lambda: recruits("wcbb"))
     run("news", 1, news_digest)
     META["built"] = NOW.isoformat()
     save("meta.json", META)

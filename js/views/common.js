@@ -20,7 +20,7 @@ export function awayHome(comp) {
 export function q(key, lg = state.lg) {
   const g = GLOSSARY[key];
   if (!g) return '';
-  const ctx = g[lg] || '';
+  const ctx = g[lg] ?? g[{ wnba: 'nba', wcbb: 'cbb' }[lg]] ?? '';
   return `<span class="q" tabindex="0">?<span class="tip"><b>${esc(g.name)}</b>${esc(g.what)}${ctx ? '<br><br>' + esc(ctx) : ''}</span></span>`;
 }
 

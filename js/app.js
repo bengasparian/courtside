@@ -1,4 +1,5 @@
 // Router, header (league switch, nav, live ticker, search, theme).
+import { L, isPro, isCollege, LEAGUES, LEAGUE_KEYS } from './league.js';
 import { $, esc, debounce, logoFor, ymd, normName } from './util.js';
 import { espn, safe, repo } from './api.js';
 import { state, teams, unpaint, meta } from './ctx.js';
@@ -10,7 +11,9 @@ export function onLeave(fn) { cleanup.push(fn); }
 
 const NAV = {
   nba: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Around the NBA'], ['standings', 'Standings'], ['draft', 'Draft']],
+  wnba: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Around the WNBA'], ['standings', 'Standings'], ['draft', 'Draft']],
   cbb: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Rankings & news'], ['conferences', 'Conferences'], ['madness', 'March Madness'], ['portal', 'Transfer portal'], ['draft', 'NBA draft']],
+  wcbb: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Rankings & news'], ['conferences', 'Conferences'], ['madness', 'March Madness'], ['portal', 'Transfer portal'], ['draft', 'WNBA draft']],
 };
 
 function parse() {
@@ -26,7 +29,7 @@ async function route() {
   cleanup = [];
   unpaint(document.documentElement);
   let { parts, params } = parse();
-  if (parts[0] === 'nba' || parts[0] === 'cbb') {
+  if (LEAGUE_KEYS.includes(parts[0])) {
     if (state.lg !== parts[0]) setLeague(parts[0], false);
   } else {
     location.replace(`#/${state.lg}`);
@@ -44,8 +47,8 @@ async function route() {
     else if (view === 'game') (await import('./views/game.js')).render(app, lg, parts[2]);
     else if (view === 'scores') (await import('./views/scores.js')).render(app, lg, params);
     else if (view === 'player') (await import('./views/players.js')).renderPage(app, lg, parts[2], parts[3]);
-    else if (lg === 'nba') (await import('./views/nbahub.js')).render(app, view, params);
-    else (await import('./views/cbbhub.js')).render(app, view, params);
+    else if (isPro(lg)) (await import('./views/nbahub.js')).render(app, view, params, lg);
+    else (await import('./views/cbbhub.js')).render(app, view, params, lg);
   } catch (e) {
     console.error(e);
     app.innerHTML = `<div class="err">Something went wrong loading this page: ${esc(e.message || e)}. Try refreshing; data sources occasionally hiccup.</div>`;
@@ -75,12 +78,12 @@ async function ticker() {
   const [sb, T] = await Promise.all([safe(espn.scoreboard(lg, null), null), teams(lg)]);
   if (lg !== state.lg) return;
   let evs = sb?.events || [];
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     // college: show ranked teams / live games first, cap length
     evs = evs.slice().sort((a, b) => score(b) - score(a)).slice(0, 40);
   }
   if (!evs.length) {
-    el.innerHTML = `<span class="tk"><span class="st">No ${lg === 'nba' ? 'NBA' : 'D-I'} games today</span></span>`;
+    el.innerHTML = `<span class="tk"><span class="st">No ${isPro(lg) ? L(lg).name : 'D-I'} games today</span></span>`;
   } else {
     el.innerHTML = evs.map(e => {
       const c = e.competitions[0], st = gameStatus(e);

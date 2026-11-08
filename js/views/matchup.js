@@ -1,4 +1,5 @@
 // Matchup prep (two teams) and single-team pages.
+import { L, isPro, isCollege } from '../league.js';
 import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js';
 import { espn, safe } from '../api.js';
 import { state, teams, paint, myNotes, seasonYear } from '../ctx.js';
@@ -72,7 +73,7 @@ export async function render(app, lg, aId, bId, tab) {
 function subLine(d, lg) {
   const s = d.std;
   const parts = [];
-  if (lg === 'nba') {
+  if (isPro(lg)) {
     if (s) parts.push(`${s.overall || `${s.w}-${s.l}`}`, s.seed ? `${ordinal(s.seed)} in ${s.confAbbr || s.conf}` : '');
     if (d.power) parts.push(`Power #${d.power.rank}`);
   } else {
@@ -94,11 +95,11 @@ async function fillHeader(app, team, lg) {
   const d = await teamData(lg, team);
   const chips = [];
   const s = d.std;
-  if (lg === 'nba' && s) {
+  if (isPro(lg) && s) {
     chips.push(`${s.overall || s.w + '-' + s.l}`, s.seed ? `${ordinal(s.seed)} in ${s.conf}` : '', s.gb && s.gb !== '-' ? `${s.gb} GB` : '', s.streak ? `Streak ${s.streak}` : '', s.last10 ? `L10 ${s.last10}` : '', s.home ? `Home ${s.home}` : '', s.road ? `Road ${s.road}` : '');
     if (d.power) chips.push(`Power rank #${d.power.rank}`);
   }
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     for (const p of d.polls || []) chips.push(`${/AP/.test(p.name) ? 'AP' : 'Coaches'} #${p.rank.current}`);
     if (s) chips.push(s.overall, `${s.conf || '0-0'} conf (${ordinal(s.confRank)} of ${s.confSize})`, s.streak ? `Streak ${s.streak}` : '');
     if (d.net && d.netCurrent) chips.push(`NET #${d.net.Rank}`);
@@ -123,7 +124,7 @@ async function teamTab(body, team, lg) {
   const K = (label, v, key, gloss, fmt = f1) => kpi(label, v == null ? '–' : fmt(v), { rank: rk[key], n, gloss });
   const style = teamStyle(r, lg, n);
   if (d.bpi) {
-    if (d.bpi.bpirank <= Math.ceil((lg === 'nba' ? 30 : 362) * 0.15)) style.push(`ESPN BPI rates them ${ordinal(d.bpi.bpirank)} overall (${signed(d.bpi.bpi)} points better than an average team on a neutral floor).`);
+    if (d.bpi.bpirank <= Math.ceil((Object.keys(d.bpiAll || {}).length || 30) * 0.15)) style.push(`ESPN BPI rates them ${ordinal(d.bpi.bpirank)} overall (${signed(d.bpi.bpi)} points better than an average team on a neutral floor).`);
   }
   const done = d.events.filter(e => e.state === 'post');
   const upcoming = d.events.filter(e => e.state !== 'post');
@@ -132,7 +133,7 @@ async function teamTab(body, team, lg) {
   body.innerHTML = `
   <div class="grid g-side">
     <div class="grid" style="align-content:start">
-      <div class="card"><div class="row"><h3 class="h3" style="margin:0">Team stats</h3><span class="sp"></span><span class="small mut">${n ? `ranks among ${n} ${lg === 'nba' ? 'NBA' : 'D-I'} teams` : ''}</span></div>
+      <div class="card"><div class="row"><h3 class="h3" style="margin:0">Team stats</h3><span class="sp"></span><span class="small mut">${n ? `ranks among ${n} ${isPro(lg) ? L(lg).name : 'D-I'} teams` : ''}</span></div>
         <div class="kpis" style="margin-top:8px">
           ${K('PPG', r.ppg, 'ppg')}${K('Opp PPG', r.oppg, 'oppg')}${K('RPG', r.rpg, 'rpg')}${K('APG', r.apg, 'apg')}${K('SPG', r.spg, 'spg')}${K('BPG', r.bpg, 'bpg')}
           ${K('TOV', r.tpg, 'tpg')}${K('FG%', r.fgp, 'fgp', null, pct)}${K('3P%', r.tpp, 'tpp', null, pct)}${K('FT%', r.ftp, 'ftp', null, pct)}${K('3PM', r.tpm, 'tpm')}${K('OREB', r.orpg, 'orpg')}
@@ -218,9 +219,20 @@ function gamesTable(evs, lg, done) {
 function outlookHTML(d, lg, team) {
   const b = d.bpi;
   const out = [];
-  if (lg === 'nba') {
+  if (isPro(lg)) {
     if (b) {
-      out.push(`<div class="kpis">${kpi('Proj. record', `${Math.round(b.projectedw)}-${Math.round(b.projectedl)}`)}${kpi('Playoffs', pct(b.probmakeplayoffs, 0))}${kpi('Play-in chance', pct(b.playinchance, 0))}${kpi('Win division', pct(b.probwindiv, 0))}${kpi('Reach conf. finals', pct(b.probmakeconfchamp, 0))}${kpi('Win title', pct(b.probwintitle, 1))}${b.projdraftslot ? kpi('Proj. draft slot', '#' + Math.round(b.projdraftslot)) : ''}${kpi('Remaining SOS', `${ordinal(b.sosremainingrank)}`, { sub: 'hardest = 1st' })}</div>`);
+      const k = [];
+      if (b.projectedw != null) k.push(kpi('Proj. record', `${Math.round(b.projectedw)}-${Math.round(b.projectedl)}`));
+      if (b.probmakeplayoffs != null) k.push(kpi('Playoffs', pct(b.probmakeplayoffs, 0)));
+      if (b.playinchance != null && lg === 'nba') k.push(kpi('Play-in chance', pct(b.playinchance, 0)));
+      if (b.probwindiv != null && lg === 'nba') k.push(kpi('Win division', pct(b.probwindiv, 0)));
+      if (b.top6seed != null && lg === 'nba') k.push(kpi('Top-6 seed', pct(b.top6seed, 0)));
+      if (b.probmakeconfchamp != null) k.push(kpi(lg === 'nba' ? 'Reach conf. finals' : 'Reach semifinals', pct(b.probmakeconfchamp, 0)));
+      if (b.probmaketitlegame != null) k.push(kpi('Reach Finals', pct(b.probmaketitlegame, 1)));
+      if (b.probwintitle != null) k.push(kpi('Win title', pct(b.probwintitle, 1)));
+      if (b.projdraftslot) k.push(kpi('Proj. draft slot', '#' + Math.round(b.projdraftslot)));
+      if (b.sosremainingrank) k.push(kpi('Remaining SOS', `${ordinal(b.sosremainingrank)}`, { sub: 'hardest = 1st' }));
+      out.push(`<div class="kpis">${k.join('')}</div>`);
       out.push('<div class="src">Projections: ESPN BPI season simulations.</div>');
     }
     const cup = d.cup;
@@ -346,11 +358,11 @@ async function overviewTab(body, A, B, lg) {
   // prediction from BPI (B is home unless the scheduled meeting is neutral)
   const next = da.events.find(e => e.oppId === B.id && e.state !== 'post');
   const neutral = next?.neutral;
-  const hca = neutral ? 0 : (lg === 'nba' ? 2.2 : 3.2);
+  const hca = neutral ? 0 : L(lg).hca;
   let pred = '';
   if (da.bpi?.bpi != null && db.bpi?.bpi != null) {
     const margin = (db.bpi.bpi - da.bpi.bpi) + hca; // + favors B
-    const sd = lg === 'nba' ? 12.5 : 10.5;
+    const sd = L(lg).sd;
     const pB = 1 / (1 + Math.exp(-1.7 * margin / sd));
     const fav = margin >= 0 ? B : A;
     pred = `<div class="card"><h3 class="h3">Projection${q('bpi', lg)}</h3>
@@ -399,7 +411,7 @@ export function storylines(A, B, da, db, lg, rA, rB) {
   const s = [];
   const streak = (d, t) => { const st = d.std?.streak; if (st && /([WL])(\d+)/.test(st)) { const [, k, n] = /([WL])(\d+)/.exec(st); if (+n >= 3) s.push(`<b>${esc(t.short || t.name)}</b> ${k === 'W' ? 'have won' : 'have lost'} ${n} straight.`); } };
   streak(da, A); streak(db, B);
-  if (lg === 'nba') {
+  if (isPro(lg)) {
     if (da.std && db.std) {
       s.push(`${esc(A.short)}: ${esc(da.std.overall || '')}, ${da.std.seed ? ordinal(da.std.seed) + ' in the ' + esc(da.std.conf) : ''}. ${esc(B.short)}: ${esc(db.std.overall || '')}, ${db.std.seed ? ordinal(db.std.seed) + ' in the ' + esc(db.std.conf) : ''}.`);
       if (da.std.conf === db.std.conf && da.std.seed && db.std.seed && Math.abs(da.std.seed - db.std.seed) <= 3) s.push('Direct conference standings implications: they are within three seeds of each other.');
@@ -440,14 +452,14 @@ function boardTab(body, A, B, lg) {
     const side = (t, d, ros, cls) => {
       const players = ros.players.slice().sort((x, y) => (x.jersey === undefined || x.jersey === '' ? 999 : +x.jersey) - (y.jersey === undefined || y.jersey === '' ? 999 : +y.jersey));
       const std = d.std;
-      const head = lg === 'nba' ? [std?.overall, std?.seed ? ordinal(std.seed) + ' ' + std.confAbbr : '', std?.streak, d.power ? 'PR #' + d.power.rank : ''] : [std?.overall, std ? `${std.conf} ${shortConf(std.confName)}` : '', d.polls?.find(p => /AP/.test(p.name)) ? 'AP #' + d.polls.find(p => /AP/.test(p.name)).rank.current : '', d.bpi?.bpirank ? 'BPI #' + d.bpi.bpirank : ''];
+      const head = isPro(lg) ? [std?.overall, std?.seed ? ordinal(std.seed) + ' ' + std.confAbbr : '', std?.streak, d.power ? 'PR #' + d.power.rank : ''] : [std?.overall, std ? `${std.conf} ${shortConf(std.confName)}` : '', d.polls?.find(p => /AP/.test(p.name)) ? 'AP #' + d.polls.find(p => /AP/.test(p.name)).rank.current : '', d.bpi?.bpirank ? 'BPI #' + d.bpi.bpirank : ''];
       const r = d.ranks;
       return `<div class="bt ${cls}"><div class="bh"><img src="${esc(t.logo)}" alt="">${esc(t.name)}<span class="sp"></span><span style="font-size:14px">${esc(head.filter(Boolean).join(' · '))}</span></div>
         <div class="tn">${ros.coach ? `<b>Coach:</b> ${esc(ros.coach.firstName)} ${esc(ros.coach.lastName)} · ` : ''}${r ? `${f1(r.ppg)} PPG (${ordinal(r.rk.ppg)}) · ${f1(r.oppg)} allowed (${ordinal(r.rk.oppg)}) · ORtg ${f1(r.ortg)} · DRtg ${f1(r.drtg)} · Pace ${f1(r.pace)}` : ''}<br>${esc(teamStyle(r, lg, d.n).slice(0, 2).join(' '))}${myNotes.get(`${lg}:team:${t.id}`) ? `<br><b>My notes:</b> ${esc(myNotes.get(`${lg}:team:${t.id}`))}` : ''}</div>
         ${players.map(p => {
           const a = p.cur?.a;
           const line = a ? `${f1(a.avgPoints)}p ${f1(a.avgRebounds)}r ${f1(a.avgAssists)}a · ${f1(a.fieldGoalPct)} FG · ${f1(a.threePointFieldGoalPct ?? a.threePointPct)} 3P · ${f1(a.avgMinutes)} min` : 'No stats this season';
-          const bits = [p.posName || p.pos, p.ht, lg === 'cbb' ? p.exp : (p.expStr || p.exp), p.recruit?.hs || p.wiki?.hs || '', lg === 'nba' ? (p.college || '') : (p.birthPlace || '')].filter(Boolean);
+          const bits = [p.posName || p.pos, p.ht, isCollege(lg) ? p.exp : (p.expStr || p.exp), p.recruit?.hs || p.wiki?.hs || '', isPro(lg) ? (p.college || '') : (p.birthPlace || '')].filter(Boolean);
           const ps = playStyle(p, lg).filter(x => !x.startsWith('('));
           const note = [ps[0], ps[1], factNotes(p, ros.players, lg, { wiki: p.wiki })[0], roleNotes(p, ros.players, lg)[0]].filter(Boolean).slice(0, 2).join(' ');
           const extra = [p.injury ? `⚕ ${p.injury}` : '', p.recruit?.stars ? `${stars(p.recruit.stars)} #${p.recruit.rank || '–'} (${p.recruit.cls})` : '', (p.portal?.[0]?.from || p.transferFrom) ? `Transfer: ${p.portal?.[0]?.from || p.transferFrom}` : '', p.mock ? `Mock #${p.mock.pick}` : ''].filter(Boolean).join(' · ');

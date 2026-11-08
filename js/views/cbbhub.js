@@ -5,54 +5,56 @@ import { state, teams, seasonYear } from '../ctx.js';
 import { newsList, teamCell, q, sortable } from './common.js';
 import { draftView } from './nbahub.js';
 import { netFor, netIsCurrent } from '../teamdata.js';
+import { L, draftLeague } from '../league.js';
 
-let T;
-export async function render(app, view, params) {
-  T = await teams('cbb');
+let T, CL = 'cbb';
+export async function render(app, view, params, lg = 'cbb') {
+  CL = lg;
+  T = await teams(CL);
   if (view === 'conferences') return conferences(app, params);
   if (view === 'madness') return madness(app, params);
   if (view === 'portal') return portal(app, params);
-  if (view === 'draft') return draftView(app, 'cbb', params);
+  if (view === 'draft') return draftView(app, CL, params);
   return league(app, params);
 }
 
 async function league(app, params) {
   const tab = params.get('tab') || 'polls';
   const tabs = [['polls', 'AP & Coaches polls'], ['bpi', 'ESPN BPI'], ['net', 'NET rankings'], ['leaders', 'National leaders'], ['news', 'News']];
-  app.innerHTML = `<h1 class="h1">College basketball rankings &amp; news</h1><div class="tabs">${tabs.map(([k, l]) => `<a href="#/cbb/league?tab=${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div><div id="lb"><div class="loading"></div></div>`;
+  app.innerHTML = `<h1 class="h1">${L(CL).name} rankings &amp; news</h1><div class="tabs">${tabs.map(([k, l]) => `<a href="#/${CL}/league?tab=${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div><div id="lb"><div class="loading"></div></div>`;
   const el = app.querySelector('#lb');
   if (tab === 'polls') {
-    const rk = await safe(espn.rankings(), null);
+    const rk = await safe(espn.rankings(CL), null);
     el.innerHTML = `<div class="grid g2">${(rk?.rankings || []).slice(0, 2).map(p => `<div class="card flush"><div class="card-h"><h3 class="h3">${esc(p.name)}</h3><span class="small mut">${esc(p.headline || p.shortHeadline || '')}</span></div><table class="t"><thead><tr><th>#</th><th>Team</th><th>Record</th><th>Pts</th><th>Prev</th></tr></thead><tbody>
-      ${(p.ranks || []).map(r => { const t = T.byId[r.team.id] || { id: r.team.id, name: r.team.location, short: r.team.location, logo: r.team.logos?.[0]?.href }; const mv = r.previous ? r.previous - r.current : null; return `<tr><td class="l b">${r.current}</td><td class="l">${teamCell(t, 'cbb')}${r.firstPlaceVotes ? ` <span class="tiny mut">(${r.firstPlaceVotes})</span>` : ''}</td><td>${esc(r.recordSummary || '')}</td><td>${r.points ?? ''}</td><td class="${mv > 0 ? 'good' : mv < 0 ? 'bad' : 'mut2'}">${r.previous ? r.previous : 'NR'}</td></tr>`; }).join('')}
+      ${(p.ranks || []).map(r => { const t = T.byId[r.team.id] || { id: r.team.id, name: r.team.location, short: r.team.location, logo: r.team.logos?.[0]?.href }; const mv = r.previous ? r.previous - r.current : null; return `<tr><td class="l b">${r.current}</td><td class="l">${teamCell(t, CL)}${r.firstPlaceVotes ? ` <span class="tiny mut">(${r.firstPlaceVotes})</span>` : ''}</td><td>${esc(r.recordSummary || '')}</td><td>${r.points ?? ''}</td><td class="${mv > 0 ? 'good' : mv < 0 ? 'bad' : 'mut2'}">${r.previous ? r.previous : 'NR'}</td></tr>`; }).join('')}
       </tbody></table>${(p.others || []).length ? `<div class="small mut" style="padding:8px 12px">Others receiving votes: ${(p.others || []).map(o => `${esc(o.team.location)} ${o.points}`).join(', ')}</div>` : ''}</div>`).join('')}</div>`;
   } else if (tab === 'bpi') {
-    const b = await safe(repo('cbb/bpi.json'), null);
+    const b = await safe(repo(`${CL}/bpi.json`), null);
     const rows = Object.entries(b?.teams || {}).sort((x, y) => (x[1].bpirank || 999) - (y[1].bpirank || 999)).slice(0, 100);
-    el.innerHTML = `<div class="card flush"><div class="tscroll"><table class="t" id="bt"><thead><tr><th data-k="r">BPI rk</th><th>Team</th><th>Conf</th><th data-k="w">W-L</th><th data-k="b">BPI${q('bpi', 'cbb')}</th><th>Off</th><th>Def</th><th data-k="sor">SOR${q('sor', 'cbb')}</th><th>Proj seed</th><th>Sweet 16</th><th>Final Four</th><th>Title</th></tr></thead><tbody>
-      ${rows.map(([id, s]) => `<tr data-r="${s.bpirank}" data-b="${s.bpi}" data-sor="${s.sorrank || 999}" data-w="${s.wins}"><td class="l b">${s.bpirank}</td><td class="l">${teamCell(T.byId[id], 'cbb')}</td><td class="small mut">${esc(T.byId[id]?.confAbbr || '')}</td><td>${s.wins}-${s.losses}</td><td class="b">${signed(s.bpi)}</td><td>${signed(s.bpioffense)}</td><td>${signed(s.bpidefense)}</td><td>${s.sorrank || '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td><td>${pct(s.chancesweet16, 0)}</td><td>${pct(s.chancefinal4, 1)}</td><td>${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">ESPN Basketball Power Index, top 100. Click a column header to sort.</div>`;
+    el.innerHTML = `<div class="card flush"><div class="tscroll"><table class="t" id="bt"><thead><tr><th data-k="r">BPI rk</th><th>Team</th><th>Conf</th><th data-k="w">W-L</th><th data-k="b">BPI${q('bpi', CL)}</th><th>Off</th><th>Def</th><th data-k="sor">SOR${q('sor', CL)}</th><th>Proj seed</th><th>Sweet 16</th><th>Final Four</th><th>Title</th></tr></thead><tbody>
+      ${rows.map(([id, s]) => `<tr data-r="${s.bpirank}" data-b="${s.bpi}" data-sor="${s.sorrank || 999}" data-w="${s.wins}"><td class="l b">${s.bpirank}</td><td class="l">${teamCell(T.byId[id], CL)}</td><td class="small mut">${esc(T.byId[id]?.confAbbr || '')}</td><td>${s.wins}-${s.losses}</td><td class="b">${signed(s.bpi)}</td><td>${signed(s.bpioffense)}</td><td>${signed(s.bpidefense)}</td><td>${s.sorrank || '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td><td>${pct(s.chancesweet16, 0)}</td><td>${pct(s.chancefinal4, 1)}</td><td>${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">ESPN Basketball Power Index, top 100. Click a column header to sort.</div>`;
     sortable(el.querySelector('#bt'));
   } else if (tab === 'net') {
-    const [n, year] = await Promise.all([safe(repo('cbb/net.json'), null), seasonYear('cbb')]);
+    const [n, year] = await Promise.all([safe(repo(`${CL}/net.json`), null), seasonYear(CL)]);
     const cur = netIsCurrent(n, year);
     const byNet = {};
     for (const t of T.list) { const r = netFor(t, n); if (r) byNet[r.Rank] = t; }
     el.innerHTML = `${cur ? '' : `<div class="card" style="margin-bottom:12px"><div class="small"><b>Showing last season's final NET (${esc(n?.updated || '')}).</b> The NCAA usually releases the first NET of a new season in early December. This page switches over on its own when it does.</div></div>`}
       <div class="card flush"><div class="tscroll"><table class="t"><thead><tr><th>NET</th><th>Team</th><th>Record</th><th>Conf</th><th>Road</th><th>Neutral</th><th>Home</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Prev</th></tr></thead><tbody>
-      ${(n?.rows || []).slice(0, 150).map(r => `<tr><td class="l b">${esc(r.Rank)}</td><td class="l">${byNet[r.Rank] ? teamCell(byNet[r.Rank], 'cbb') : esc(r.School)}</td><td>${esc(r.Record)}</td><td class="small mut">${esc(r.Conf)}</td><td>${esc(r.Road)}</td><td>${esc(r.Neutral)}</td><td>${esc(r.Home)}</td><td class="b">${esc(r['Quad 1'])}</td><td>${esc(r['Quad 2'])}</td><td>${esc(r['Quad 3'])}</td><td>${esc(r['Quad 4'])}</td><td>${esc(r.Prev)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">NCAA Evaluation Tool via ncaa.com. ${q('net_rank', 'cbb')}</div>`;
+      ${(n?.rows || []).slice(0, 150).map(r => `<tr><td class="l b">${esc(r.Rank)}</td><td class="l">${byNet[r.Rank] ? teamCell(byNet[r.Rank], CL) : esc(r.School)}</td><td>${esc(r.Record)}</td><td class="small mut">${esc(r.Conf)}</td><td>${esc(r.Road)}</td><td>${esc(r.Neutral)}</td><td>${esc(r.Home)}</td><td class="b">${esc(r['Quad 1'])}</td><td>${esc(r['Quad 2'])}</td><td>${esc(r['Quad 3'])}</td><td>${esc(r['Quad 4'])}</td><td>${esc(r.Prev)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">NCAA Evaluation Tool via ncaa.com. ${q('net_rank', CL)}</div>`;
   } else if (tab === 'leaders') {
-    const year = await seasonYear('cbb');
-    const L = await safe(espn.leaders('cbb', year), null);
+    const year = await seasonYear(CL);
+    const L = await safe(espn.leaders(CL, year), null);
     const cats = L?.leaders?.categories || [];
     el.innerHTML = cats.length ? `<div class="grid g3">${cats.slice(0, 12).map(c => `<div class="card flush"><div class="card-h"><h3 class="h3">${esc(c.displayName || c.name)}</h3></div><table class="t"><tbody>${(c.leaders || []).slice(0, 10).map((l, i) => { const tm = l.team || l.athlete?.team || {}; const t = T.byId[tm.id]; return `<tr><td class="l" style="width:20px">${i + 1}</td><td class="l"><span class="tm">${t ? `<img src="${esc(logoFor(t, state.theme))}" alt="">` : ''}${esc(l.athlete?.displayName || '')}</span></td><td class="b">${esc(l.displayValue)}</td></tr>`; }).join('')}</tbody></table></div>`).join('')}</div><div class="src">ESPN national statistical leaders. Every player's national rank is also on his card in the matchup view.</div>` : '<div class="empty">National leaders are not available right now. Each player\'s national ranks are on his player card.</div>';
   } else {
-    const n = await safe(espn.news('cbb', null, 30), null);
+    const n = await safe(espn.news(CL, null, 30), null);
     el.innerHTML = `<div class="card">${newsList(n?.articles, { limit: 25 })}</div>`;
   }
 }
 
 async function conferences(app, params) {
-  const [st, b, confs] = await Promise.all([safe(repo('cbb/standings.json'), null), safe(repo('cbb/bpi.json'), null), safe(repo('cbb/conferences.json'), null)]);
+  const [st, b, confs] = await Promise.all([safe(repo(`${CL}/standings.json`), null), safe(repo(`${CL}/bpi.json`), null), safe(repo(`${CL}/conferences.json`), null)]);
   const names = Object.keys(st || {}).sort();
   const sel = params.get('c') || names.find(n => /Big Ten/.test(n)) || names[0];
   const rows = (st?.[sel] || []);
@@ -62,16 +64,16 @@ async function conferences(app, params) {
   app.innerHTML = `<div class="row wrap"><h1 class="h1">Conferences</h1><span class="sp"></span><select id="cs" style="padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt)">${names.map(n => `<option ${n === sel ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
     <div class="grid g-side" style="margin-top:14px">
       <div class="card flush"><div class="card-h"><h3 class="h3">${esc(sel)} standings</h3><span class="small mut">${ordinal(strength.findIndex(s => s.n === sel) + 1)} of ${names.length} conferences by average BPI</span></div><div class="tscroll"><table class="t"><thead><tr><th>#</th><th>Team</th><th>Conf</th><th>Overall</th><th>Home</th><th>Road</th><th>Strk</th><th>BPI rk</th><th>Win conf.</th><th>Proj seed</th></tr></thead><tbody>
-        ${rows.map(r => { const s = B[r.id] || {}; return `<tr><td class="l">${r.confRank}</td><td class="l">${teamCell(T.byId[r.id], 'cbb')}</td><td class="b">${esc(r.conf || '0-0')}</td><td>${esc(r.overall || '')}</td><td>${esc(r.home || '')}</td><td>${esc(r.road || '')}</td><td>${esc(r.streak || '')}</td><td>${s.bpirank || '–'}</td><td>${s.chancewinconfortie != null ? pct(s.chancewinconfortie, 0) : '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td></tr>`; }).join('')}
+        ${rows.map(r => { const s = B[r.id] || {}; return `<tr><td class="l">${r.confRank}</td><td class="l">${teamCell(T.byId[r.id], CL)}</td><td class="b">${esc(r.conf || '0-0')}</td><td>${esc(r.overall || '')}</td><td>${esc(r.home || '')}</td><td>${esc(r.road || '')}</td><td>${esc(r.streak || '')}</td><td>${s.bpirank || '–'}</td><td>${s.chancewinconfortie != null ? pct(s.chancewinconfortie, 0) : '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td></tr>`; }).join('')}
       </tbody></table></div></div>
-      <div class="card flush"><div class="card-h"><h3 class="h3">Conference power (avg BPI)</h3></div><table class="t"><tbody>${strength.slice(0, 32).map((s, i) => `<tr class="${s.n === sel ? 'hl' : ''}"><td class="l">${i + 1}</td><td class="l"><a href="#/cbb/conferences?c=${encodeURIComponent(s.n)}">${esc(s.n.replace(/ Conference$/, ''))}</a></td><td>${s.avg > -99 ? signed(s.avg) : '–'}</td></tr>`).join('')}</tbody></table></div>
+      <div class="card flush"><div class="card-h"><h3 class="h3">Conference power (avg BPI)</h3></div><table class="t"><tbody>${strength.slice(0, 32).map((s, i) => `<tr class="${s.n === sel ? 'hl' : ''}"><td class="l">${i + 1}</td><td class="l"><a href="#/${CL}/conferences?c=${encodeURIComponent(s.n)}">${esc(s.n.replace(/ Conference$/, ''))}</a></td><td>${s.avg > -99 ? signed(s.avg) : '–'}</td></tr>`).join('')}</tbody></table></div>
     </div>`;
-  app.querySelector('#cs').addEventListener('change', e => { location.hash = `#/cbb/conferences?c=${encodeURIComponent(e.target.value)}`; });
+  app.querySelector('#cs').addEventListener('change', e => { location.hash = `#/${CL}/conferences?c=${encodeURIComponent(e.target.value)}`; });
   void confs;
 }
 
 async function madness(app) {
-  const [b, year, n] = await Promise.all([safe(repo('cbb/bpi.json'), null), seasonYear('cbb'), safe(espn.news('cbb', null, 50), null)]);
+  const [b, year, n] = await Promise.all([safe(repo(`${CL}/bpi.json`), null), seasonYear(CL), safe(espn.news(CL, null, 50), null)]);
   const B = b?.teams || {};
   let field = Object.entries(B).filter(([, s]) => s.projectedtournamentseed).sort((x, y) => (x[1].projectedtournamentorder || x[1].projectedtournamentseed * 4) - (y[1].projectedtournamentorder || y[1].projectedtournamentseed * 4));
   let own = false;
@@ -101,12 +103,12 @@ async function madness(app) {
   const tourney = now.getMonth() === 2 && now.getDate() >= 14 || (now.getMonth() === 3 && now.getDate() <= 8);
   let bracket = '';
   if (tourney) {
-    const sb = await safe(espn.scoreboardRange('cbb', `${year}0317-${year}0408`, '&groups=100'), null);
+    const sb = await safe(espn.scoreboardRange(CL, `${year}0317-${year}0408`, '&groups=100'), null);
     const evs = sb?.events || [];
     if (evs.length) {
       const rounds = {};
       for (const e of evs) { const r = (e.competitions[0].notes || [])[0]?.headline?.replace(/^.*? - /, '') || 'Tournament'; (rounds[r] = rounds[r] || []).push(e); }
-      bracket = `<div class="card" style="margin-bottom:14px"><h3 class="h3">NCAA Tournament: live results</h3>${Object.entries(rounds).map(([r, es]) => `<div style="margin-bottom:10px"><div class="small b">${esc(r)}</div><div class="games">${es.map(e => { const c = e.competitions[0]; return `<a class="gc" href="#/cbb/game/${e.id}">${c.competitors.map(x => `<div class="tr ${e.status.type.completed && !x.winner ? 'lose' : ''}"><span class="mut2 small">${x.curatedRank?.current && x.curatedRank.current < 99 ? x.curatedRank.current : ''}</span><img src="${esc(x.team.logo)}" alt=""><span class="nm">${esc(x.team.shortDisplayName)}</span><span class="sc">${esc(x.score ?? '')}</span></div>`).join('')}<div class="ft">${esc(e.status.type.shortDetail)}</div></a>`; }).join('')}</div></div>`).join('')}</div>`;
+      bracket = `<div class="card" style="margin-bottom:14px"><h3 class="h3">NCAA Tournament: live results</h3>${Object.entries(rounds).map(([r, es]) => `<div style="margin-bottom:10px"><div class="small b">${esc(r)}</div><div class="games">${es.map(e => { const c = e.competitions[0]; return `<a class="gc" href="#/${CL}/game/${e.id}">${c.competitors.map(x => `<div class="tr ${e.status.type.completed && !x.winner ? 'lose' : ''}"><span class="mut2 small">${x.curatedRank?.current && x.curatedRank.current < 99 ? x.curatedRank.current : ''}</span><img src="${esc(x.team.logo)}" alt=""><span class="nm">${esc(x.team.shortDisplayName)}</span><span class="sc">${esc(x.score ?? '')}</span></div>`).join('')}<div class="ft">${esc(e.status.type.shortDetail)}</div></a>`; }).join('')}</div></div>`).join('')}</div>`;
     }
   }
   const madNews = (n?.articles || []).filter(a => /bracket|tournament|March Madness|seed|bubble|NCAA/i.test(`${a.headline} ${a.description}`));
@@ -114,11 +116,11 @@ async function madness(app) {
     ${bracket}
     <div class="grid g-side" style="margin-top:12px">
       <div class="card flush"><div class="card-h"><h3 class="h3">Projected field by seed (${own ? 'Courtside projection from ESPN BPI' : 'ESPN BPI'})</h3><span class="small mut">${field.length} teams</span></div><div class="tscroll"><table class="t"><thead><tr><th>Seed</th><th>Teams</th></tr></thead><tbody>
-        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], 'cbb')}<span class="tiny mut">${s.wins}-${s.losses}${s.auto ? ' · auto' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
+        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], CL)}<span class="tiny mut">${s.wins}-${s.losses}${s.auto ? ' · auto' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
       </tbody></table></div></div>
       <div class="grid" style="align-content:start">
-        <div class="card flush"><div class="card-h"><h3 class="h3">Best teams projected out</h3></div><table class="t"><tbody>${out.map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], 'cbb')}</td><td>${s.wins}-${s.losses}</td><td class="small mut">BPI #${s.bpirank}</td></tr>`).join('')}</tbody></table></div>
-        <div class="card flush"><div class="card-h"><h3 class="h3">Title favorites</h3></div><table class="t"><thead><tr><th>Team</th><th>F4</th><th>Title</th></tr></thead><tbody>${Object.entries(B).sort((x, y) => (y[1].chancencaachampion || 0) - (x[1].chancencaachampion || 0)).slice(0, 12).map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], 'cbb')}</td><td>${pct(s.chancefinal4, 1)}</td><td class="b">${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="card flush"><div class="card-h"><h3 class="h3">Best teams projected out</h3></div><table class="t"><tbody>${out.map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], CL)}</td><td>${s.wins}-${s.losses}</td><td class="small mut">BPI #${s.bpirank}</td></tr>`).join('')}</tbody></table></div>
+        <div class="card flush"><div class="card-h"><h3 class="h3">Title favorites</h3></div><table class="t"><thead><tr><th>Team</th><th>F4</th><th>Title</th></tr></thead><tbody>${Object.entries(B).sort((x, y) => (y[1].chancencaachampion || 0) - (x[1].chancencaachampion || 0)).slice(0, 12).map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], CL)}</td><td>${pct(s.chancefinal4, 1)}</td><td class="b">${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div>
         <div class="card"><h3 class="h3">Bracket &amp; bubble news</h3>${newsList(madNews.length ? madNews : n?.articles, { limit: 6 })}</div>
       </div>
     </div>
@@ -127,12 +129,16 @@ async function madness(app) {
 }
 
 async function portal(app, params) {
-  const [p, n] = await Promise.all([safe(repo('cbb/portal.json'), null), safe(espn.news('cbb', null, 50), null)]);
+  const [p, n] = await Promise.all([safe(repo(`${CL}/portal.json`), null), safe(espn.news(CL, null, 50), null)]);
+  if (!p?.players || !Object.keys(p.players).length) {
+    app.innerHTML = `<h1 class="h1">Transfer portal</h1><div class="card" style="margin-top:12px"><div class="small">No free transfer-portal feed is available for ${esc(L(CL).full)} right now. Every player's school path and "Transfer from" tag are still on their cards (from ESPN season data), and portal news is below.</div></div><div class="card" style="margin-top:12px">${newsList(((n?.articles) || []).filter(a => /transfer|portal/i.test(`${a.headline} ${a.description}`)).concat(n?.articles || []), { limit: 12 })}</div>`;
+    return;
+  }
   const rows = Object.values(p?.players || {}).flat().sort((a, b) => (b.year - a.year) || ((a.rank || 9999) - (b.rank || 9999)));
   const years = [...new Set(rows.map(r => r.year))].sort((a, b) => b - a);
   const yr = +(params.get('y') || years[0] || 0);
   const pn = (n?.articles || []).filter(a => /transfer|portal/i.test(`${a.headline} ${a.description}`));
-  app.innerHTML = `<div class="row wrap"><h1 class="h1">Transfer portal: top moves</h1><span class="sp"></span>${years.map(y => `<a class="chip ${y === yr ? 'acc' : ''}" href="#/cbb/portal?y=${y}">${y}</a>`).join(' ')}</div>
+  app.innerHTML = `<div class="row wrap"><h1 class="h1">Transfer portal: top moves</h1><span class="sp"></span>${years.map(y => `<a class="chip ${y === yr ? 'acc' : ''}" href="#/${CL}/portal?y=${y}">${y}</a>`).join(' ')}</div>
     <div class="grid g-side" style="margin-top:12px">
       <div class="card flush"><div class="card-h"><input id="pf" placeholder="Filter by player or school" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--txt)"><span class="small mut" id="pc"></span></div>
         <div class="tscroll" style="max-height:900px"><table class="t" id="pt"><thead><tr><th data-k="rank">Rank</th><th data-k="name">Player</th><th>Pos</th><th>From</th><th>To</th><th data-k="stars">★</th><th>Status</th><th>HS / hometown</th></tr></thead><tbody></tbody></table></div></div>

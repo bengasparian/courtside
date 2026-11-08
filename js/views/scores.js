@@ -1,3 +1,4 @@
+import { isPro, isCollege } from '../league.js';
 import { esc, ymd } from '../util.js';
 import { espn, safe } from '../api.js';
 import { teams } from '../ctx.js';
@@ -8,10 +9,10 @@ export async function render(app, lg, params) {
   const T = await teams(lg);
   const ds = params.get('d');
   const date = ds ? new Date(+ds.slice(0, 4), +ds.slice(4, 6) - 1, +ds.slice(6, 8)) : new Date();
-  const filter = params.get('f') || (lg === 'cbb' ? 'top25' : 'all');
+  const filter = params.get('f') || (isCollege(lg) ? 'top25' : 'all');
   const conf = params.get('c') || '';
   const shift = n => { const d = new Date(date); d.setDate(d.getDate() + n); return ymd(d); };
-  const link = (d, f = filter, c = conf) => `#/${lg}/scores?d=${d}${lg === 'cbb' ? `&f=${f}${c ? '&c=' + encodeURIComponent(c) : ''}` : ''}`;
+  const link = (d, f = filter, c = conf) => `#/${lg}/scores?d=${d}${isCollege(lg) ? `&f=${f}${c ? '&c=' + encodeURIComponent(c) : ''}` : ''}`;
   const confs = [...new Set(T.list.map(t => t.conf).filter(Boolean))].sort();
   app.innerHTML = `<div class="row wrap" style="margin-bottom:12px;gap:8px">
       <h1 class="h1">Scores</h1><span class="sp"></span>
@@ -20,7 +21,7 @@ export async function render(app, lg, params) {
       <a class="btn sm" href="${link(shift(1))}">▶</a>
       <a class="btn sm" href="${link(ymd(new Date()))}">Today</a>
     </div>
-    ${lg === 'cbb' ? `<div class="subtabs"><button data-f="top25" class="${filter === 'top25' ? 'on' : ''}">Top 25</button><button data-f="all" class="${filter === 'all' && !conf ? 'on' : ''}">All D-I</button>
+    ${isCollege(lg) ? `<div class="subtabs"><button data-f="top25" class="${filter === 'top25' ? 'on' : ''}">Top 25</button><button data-f="all" class="${filter === 'all' && !conf ? 'on' : ''}">All D-I</button>
       <select id="cf" style="padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt)"><option value="">Conference…</option>${confs.map(c => `<option ${c === conf ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>` : ''}
     <div class="small mut" id="cnt"></div>
     <div class="games" id="g"><div class="loading">Loading…</div></div>`;
@@ -32,7 +33,7 @@ export async function render(app, lg, params) {
   const load = async () => {
     const sb = await safe(espn.scoreboard(lg, ymd(date)), null);
     let evs = sb?.events || [];
-    if (lg === 'cbb') {
+    if (isCollege(lg)) {
       if (conf) evs = evs.filter(e => e.competitions[0].competitors.some(c => T.byId[c.team.id]?.conf === conf));
       else if (filter === 'top25') evs = evs.filter(e => e.competitions[0].competitors.some(c => c.curatedRank?.current <= 25));
       evs.sort((a, b) => best(a) - best(b));

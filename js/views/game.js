@@ -1,4 +1,5 @@
 // Live box score / game preview.
+import { L } from '../league.js';
 import { esc, logoFor, fmtDate, fmtTime, sparkline, num } from '../util.js';
 import { espn, safe } from '../api.js';
 import { state, teams, paint } from '../ctx.js';
@@ -33,8 +34,8 @@ function draw(app, lg, s, T) {
   const live = st.state === 'in';
   const rank = c => (c.rank && c.rank <= 25 ? `<span class="mut2 small">${c.rank}</span> ` : '');
   const rec = c => (c.record || []).map(r => r.summary || r.displayValue).filter(Boolean)[0] || '';
-  const periods = Math.max(away.linescores?.length || 0, home.linescores?.length || 0, lg === 'nba' ? 4 : 2);
-  const pLabel = i => (lg === 'nba' ? (i < 4 ? `Q${i + 1}` : `OT${i - 3 > 1 ? i - 3 : ''}`) : (i < 2 ? `H${i + 1}` : `OT${i - 1 > 1 ? i - 1 : ''}`));
+  const periods = Math.max(away.linescores?.length || 0, home.linescores?.length || 0, L(lg).quarters ? 4 : 2);
+  const pLabel = i => (L(lg).quarters ? (i < 4 ? `Q${i + 1}` : `OT${i - 3 > 1 ? i - 3 : ''}`) : (i < 2 ? `H${i + 1}` : `OT${i - 1 > 1 ? i - 1 : ''}`));
   const ls = c => Array.from({ length: periods }, (_, i) => `<td>${esc(c.linescores?.[i]?.displayValue ?? c.linescores?.[i]?.value ?? '')}</td>`).join('');
   const gi = s.gameInfo || {};
   const odds = (s.pickcenter || [])[0];

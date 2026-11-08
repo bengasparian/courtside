@@ -7,7 +7,8 @@ const SITEV2 = 'https://site.api.espn.com/apis/v2/sports/basketball/';
 const WEB = 'https://site.web.api.espn.com/apis/common/v3/sports/basketball/';
 const WEB3 = 'https://site.web.api.espn.com/apis/site/v3/sports/basketball/';
 const CORE = 'https://sports.core.api.espn.com/v2/sports/basketball/leagues/';
-export const LG = { nba: 'nba', cbb: 'mens-college-basketball' };
+import { LEAGUES } from './league.js';
+export const LG = Object.fromEntries(Object.entries(LEAGUES).map(([k, v]) => [k, v.espn]));
 
 const mem = new Map();
 const inflight = new Map();
@@ -80,7 +81,7 @@ export const repo = (path, ttl = 600) => getJSON(REPO_DATA + path, ttl);
 
 // ---------- ESPN
 export const espn = {
-  scoreboard: (lg, date, extra = '') => getJSON(`${SITE}${LG[lg]}/scoreboard?${date ? 'dates=' + date + '&' : ''}${lg === 'cbb' ? 'groups=50&limit=400' : 'limit=100'}${extra}`, 20),
+  scoreboard: (lg, date, extra = '') => getJSON(`${SITE}${LG[lg]}/scoreboard?${date ? 'dates=' + date + '&' : ''}${LEAGUES[lg] && !LEAGUES[lg].pro ? 'groups=50&limit=400' : 'limit=100'}${extra}`, 20),
   scoreboardRange: (lg, range, extra = '') => getJSON(`${SITE}${LG[lg]}/scoreboard?dates=${range}&limit=1000${extra}`, 600),
   summary: (lg, id, ttl = 15) => getJSON(`${SITE}${LG[lg]}/summary?event=${id}`, ttl, { persist: false }),
   roster: (lg, id) => getJSON(`${SITE}${LG[lg]}/teams/${id}/roster`, 600),
@@ -88,12 +89,17 @@ export const espn = {
   schedule: (lg, id, season, type) => getJSON(`${SITE}${LG[lg]}/teams/${id}/schedule${season ? '?season=' + season + (type ? '&seasontype=' + type : '') : ''}`, 600),
   news: (lg, team, limit = 25) => getJSON(`${SITE}${LG[lg]}/news?limit=${limit}${team ? '&team=' + team : ''}`, 600),
   standings: (lg, extra = '') => getJSON(`${SITEV2}${LG[lg]}/standings${extra}`, 900),
-  rankings: () => getJSON(`${SITE}mens-college-basketball/rankings`, 1800),
+  rankings: (lg = 'cbb') => getJSON(`${SITE}${LG[lg]}/rankings`, 1800),
   athlete: (lg, id) => getJSON(`${WEB}${LG[lg]}/athletes/${id}`, 1800),
   athleteStats: (lg, id) => getJSON(`${WEB}${LG[lg]}/athletes/${id}/stats`, 1800),
   athleteOverview: (lg, id) => getJSON(`${WEB}${LG[lg]}/athletes/${id}/overview`, 900),
   gamelog: (lg, id) => getJSON(`${WEB}${LG[lg]}/athletes/${id}/gamelog`, 1800),
   leaders: (lg, season) => getJSON(`${WEB3}${LG[lg]}/leaders?season=${season}&seasontype=2`, 3600),
+  coach: (lg, id) => getJSON(`${CORE}${LG[lg]}/coaches/${id}`, 86400),
+  coachSeason: (lg, season, id) => getJSON(`${CORE}${LG[lg]}/seasons/${season}/types/2/coaches/${id}/record`, 3600),
+  prevAthletes: (lg, season, teamId) => getJSON(`${CORE}${LG[lg]}/seasons/${season}/teams/${teamId}/athletes?limit=200`, 86400),
+  coreAthlete: (lg, id) => getJSON(`${CORE}${LG[lg]}/athletes/${id}`, 86400),
+  core: (url, ttl = 86400) => getJSON(String(url).replace('http://', 'https://'), ttl),
   record: (lg, season, id) => getJSON(`${CORE}${LG[lg]}/seasons/${season}/types/2/teams/${id}/record`, 86400),
   injuries: (lg) => getJSON(`${SITE}${LG[lg]}/injuries`, 900),
 };

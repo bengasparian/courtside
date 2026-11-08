@@ -1,11 +1,12 @@
 // Turns raw ESPN / Wikipedia / data-branch numbers into commentator notes:
 // advanced stats (with what they mean), play style, role, background and talking points.
+import { L, isPro, isCollege, scope, gender } from './league.js';
 import { num, f1, pct, ordinal, normName } from './util.js';
 import { wiki, safe } from './api.js';
 
 // ---------------------------------------------------------------- glossary (shown next to every advanced stat)
 export const GLOSSARY = {
-  ts: { label: 'TS%', name: 'True Shooting %', what: 'Scoring efficiency that counts threes and free throws. Points ÷ (2 × (FGA + 0.44 × FTA)).', nba: 'NBA average ≈ 57–58%. 60%+ is very good, 64%+ elite.', cbb: 'D-I average ≈ 54%. 58%+ is very good, 62%+ elite.' },
+  ts: { label: 'TS%', name: 'True Shooting %', what: 'Scoring efficiency that counts threes and free throws. Points ÷ (2 × (FGA + 0.44 × FTA)).', nba: 'NBA average ≈ 57–58%. 60%+ is very good, 64%+ elite.', cbb: 'D-I average ≈ 54%. 58%+ is very good, 62%+ elite.', wnba: 'WNBA average ≈ 54%. 57%+ is very good, 61%+ elite.', wcbb: 'Women\u2019s D-I average ≈ 51%. 55%+ is very good, 59%+ elite.' },
   efg: { label: 'eFG%', name: 'Effective FG %', what: 'Field-goal % with threes worth 1.5 makes: (FGM + 0.5 × 3PM) ÷ FGA.', nba: 'NBA average ≈ 54%.', cbb: 'D-I average ≈ 50%.' },
   usg: { label: 'USG%', name: 'Usage Rate', what: 'Share of team possessions a player uses (shot, free throws or turnover) while on the floor.', nba: '20% is average for a starter; 28%+ is a primary option; 32%+ is a heliocentric star.', cbb: '20% is average; 26%+ is a go-to scorer.' },
   ast: { label: 'AST%', name: 'Assist Rate', what: 'Share of teammates’ made baskets this player assisted while on the floor.', nba: '30%+ is a lead playmaker; 15–20% is a capable passer.', cbb: '25%+ is a lead playmaker.' },
@@ -18,7 +19,7 @@ export const GLOSSARY = {
   ortg: { label: 'ORtg', name: 'Offensive Rating', what: 'Points scored per 100 possessions (possessions estimated from box score).', nba: 'League average ≈ 114–116.', cbb: 'D-I average ≈ 105–108.' },
   drtg: { label: 'DRtg', name: 'Defensive Rating', what: 'Points allowed per 100 possessions. Lower is better.', nba: 'League average ≈ 114–116.', cbb: 'D-I average ≈ 105–108.' },
   net: { label: 'Net', name: 'Net Rating', what: 'Offensive rating minus defensive rating: point margin per 100 possessions.', nba: '+5 is a contender, +10 is historically great.', cbb: '+15 is a top-25 team, +25 is a title favorite.' },
-  pace: { label: 'Pace', name: 'Pace', what: 'Estimated possessions per game. Higher = faster tempo.', nba: 'League average ≈ 99–100.', cbb: 'D-I average ≈ 68.' },
+  pace: { label: 'Pace', name: 'Pace', what: 'Estimated possessions per game. Higher = faster tempo.', nba: 'League average ≈ 99–100.', cbb: 'D-I average ≈ 68.', wnba: 'League average ≈ 79–80 (40-minute games).', wcbb: 'Women\u2019s D-I average ≈ 70.' },
   tovPct: { label: 'TOV%', name: 'Turnover %', what: 'Turnovers per 100 possessions. Lower is better.', nba: '≈ 13% is average.', cbb: '≈ 17% is average.' },
   bpi: { label: 'BPI', name: 'ESPN Basketball Power Index', what: 'ESPN’s predictive team rating: expected point margin vs an average team on a neutral floor.', nba: '', cbb: '' },
   net_rank: { label: 'NET', name: 'NCAA Evaluation Tool', what: 'The NCAA selection committee’s primary sorting tool for the tournament field.', nba: '', cbb: 'Quad 1 wins (home vs top 30, neutral vs top 50, road vs top 75) are what résumés are judged on.' },
@@ -84,7 +85,7 @@ export function teamTotals(teamStatsJs, minutesPerGame) {
 /** Advanced numbers for a player season. a = per-game averages map from parseAthleteStats. */
 export function advanced(a, tm, lg) {
   if (!a || !a.gamesPlayed) return null;
-  const per = lg === 'nba' ? 36 : 40;
+  const per = L(lg).per;
   const gp = a.gamesPlayed, min = a.avgMinutes || 0, mp = min * gp;
   const fga = a.avgFieldGoalsAttempted || 0, fgm = a.avgFieldGoalsMade || 0, fta = a.avgFreeThrowsAttempted || 0, ftm = a.avgFreeThrowsMade || 0;
   const tpa = a.avgThreePointFieldGoalsAttempted || 0, tpm = a.avgThreePointFieldGoalsMade || 0;
@@ -109,12 +110,12 @@ export function advanced(a, tm, lg) {
     o.ast = astDen > 0 ? 100 * ast * gp / astDen : null;
     o.minShare = 100 * mp / (tm.mp / 5) / 1; // % of available team minutes at one position slot
   }
-  o.per = lg === 'nba' ? null : null;
+  o.per = isPro(lg) ? null : null;
   o.perMin = per;
   return o;
 }
 
-const T = lg => (lg === 'nba' ? 0 : 3); // college thresholds a few points lower for shooting efficiency
+const T = lg => L(lg).ts; // lower efficiency benchmarks for the WNBA and college
 
 export function tsTier(ts, lg) {
   if (ts == null) return '';
@@ -142,8 +143,8 @@ export function playStyle(p, lg) {
     a = p.prev.a; x = advanced(a, null, lg);
     notes.push(`(Small sample this season, so this profile uses his ${p.prev.label} season: ${a.gamesPlayed} games${p.prevSchool ? ' at ' + p.prevSchool : ''}.)`);
   }
-  if (!a || !x || !a.gamesPlayed) return notes;
-  const pm = lg === 'nba' ? 36 : 40;
+  if (!a || !x || !a.gamesPlayed) return notes.map(x2 => gender(lg, x2));
+  const pm = L(lg).per;
   const d = T(lg);
   const pos = (p.pos || '').toUpperCase();
   const big = /C|PF|F-C|C-F/.test(pos) || (p.htIn && p.htIn >= 82);
@@ -167,7 +168,7 @@ export function playStyle(p, lg) {
     if (ftp >= 88) notes.push(`Automatic at the line (${f1(ftp)}% FT). A good late-game ball handler.`);
     else if (ftp < 65) notes.push(`Struggles at the line (${f1(ftp)}% FT). A possible hack/foul target late.`);
   }
-  if (x.ts != null && a.avgPoints >= 8) notes.push(`Efficiency: ${f1(x.ts)}% true shooting, ${tsTier(x.ts, lg)} for ${lg === 'nba' ? 'the NBA' : 'D-I'}.`);
+  if (x.ts != null && a.avgPoints >= 8) notes.push(`Efficiency: ${f1(x.ts)}% true shooting, ${tsTier(x.ts, lg)} for ${isPro(lg) ? 'the ' + L(lg).name : 'D-I'}.`);
   // creation
   if (x.ast != null && x.ast >= 28) notes.push(`Primary playmaker. Assists on ${Math.round(x.ast)}% of teammate baskets while he plays.`);
   else if (x.p36 && x.p36.ast >= 5.5) notes.push(`Creates for others: ${f1(x.p36.ast)} assists per ${pm}.`);
@@ -182,7 +183,7 @@ export function playStyle(p, lg) {
     if (x.p36.stl >= 1.7) notes.push(`Active hands: ${f1(x.p36.stl)} steals per ${pm}. Jumps passing lanes.`);
   }
   if (a.avgFouls >= 3.5 && a.avgMinutes < 30) notes.push(`Foul-prone (${f1(a.avgFouls)} PF in ${f1(a.avgMinutes)} min). Watch for early foul trouble.`);
-  return notes;
+  return notes.map(x => gender(lg, x));
 }
 const cap = s => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
@@ -192,7 +193,7 @@ export function roleNotes(p, roster, lg) {
   const out = [];
   if (!a || !a.gamesPlayed) {
     out.push(p.injury ? `Not yet playing this season (${p.injury}).` : 'Has not logged a game this season.');
-    return out;
+    return out.map(x => gender(lg, x));
   }
   const gs = a.gamesStarted || 0, gp = a.gamesPlayed;
   const starter = gs / gp >= 0.5;
@@ -211,7 +212,7 @@ export function roleNotes(p, roster, lg) {
   lead('blocks', r => r.cur?.a?.avgBlocks);
   lead('made threes', r => r.cur?.a?.avgThreePointFieldGoalsMade);
   if (leads.length) out.push(`Leads the team in ${leads.join(', ')}.`);
-  return out;
+  return out.map(x => gender(lg, x));
 }
 
 // ---------------------------------------------------------------- talking points
@@ -220,8 +221,8 @@ export function factNotes(p, roster, lg, extra = {}) {
   const a = p.cur?.a;
   // national / league ranks from ESPN statsSummary
   for (const s of p.ranks || []) {
-    const lim = lg === 'nba' ? 25 : 100;
-    if (s.rank && s.rank <= lim) facts.push(`Ranks ${s.rankDisplayValue || ordinal(s.rank)} in ${lg === 'nba' ? 'the NBA' : 'the nation'} in ${s.displayName.toLowerCase()} (${s.displayValue}).`);
+    const lim = isPro(lg) ? 25 : 100;
+    if (s.rank && s.rank <= lim) facts.push(`Ranks ${s.rankDisplayValue || ordinal(s.rank)} in ${scope(lg)} in ${s.displayName.toLowerCase()} (${s.displayValue}).`);
   }
   // game log: highs and streaks
   const gl = p.gamelog || [];
@@ -246,18 +247,18 @@ export function factNotes(p, roster, lg, extra = {}) {
     }
   }
   // career milestones (NBA)
-  if (lg === 'nba' && p.careerTot) {
+  if (isPro(lg) && p.careerTot) {
     const ms = [['points', 1000, 'points'], ['totalRebounds', 1000, 'rebounds'], ['assists', 1000, 'assists'], ['threePointFieldGoalsMade', 250, 'made threes']];
     for (const [k, step, label] of ms) {
       const v = p.careerTot[k];
       if (!v || v < step) continue;
       const next = Math.ceil((v + 1) / step) * step;
       const need = next - v;
-      const perGame = lg === 'nba' ? { points: a?.avgPoints, totalRebounds: a?.avgRebounds, assists: a?.avgAssists, threePointFieldGoalsMade: a?.avgThreePointFieldGoalsMade }[k] : null;
+      const perGame = isPro(lg) ? { points: a?.avgPoints, totalRebounds: a?.avgRebounds, assists: a?.avgAssists, threePointFieldGoalsMade: a?.avgThreePointFieldGoalsMade }[k] : null;
       if (perGame && need <= perGame * 6) facts.push(`Milestone watch: ${need.toLocaleString()} ${label} away from ${next.toLocaleString()} for his career (has ${v.toLocaleString()}).`);
     }
   }
-  if (p.careerTot?.points >= 10000 && lg === 'nba') facts.push(`${p.careerTot.points.toLocaleString()} career points.`);
+  if (p.careerTot?.points >= 10000 && isPro(lg)) facts.push(`${p.careerTot.points.toLocaleString()} career points.`);
   // awards (ESPN)
   for (const aw of (p.awards || []).slice(0, 8)) facts.push(`${aw.displayCount ? aw.displayCount + ' ' : ''}${aw.name}${aw.seasons?.length ? ` (${aw.seasons.slice(0, 6).join(', ')}${aw.seasons.length > 6 ? '…' : ''})` : ''}.`);
   // roster context
@@ -272,7 +273,7 @@ export function factNotes(p, roster, lg, extra = {}) {
   }
   if (p.birthCountry && p.birthCountry !== 'USA') facts.push(`International player, born in ${p.birthPlace || p.birthCountry}.`);
   if (extra.wiki?.highlights?.length) facts.push(...extra.wiki.highlights.slice(0, 6).map(h => h.endsWith('.') ? h : h + '.'));
-  return [...new Set(facts)];
+  return [...new Set(facts)].map(x => gender(lg, x));
 }
 
 // ---------------------------------------------------------------- game log parsing (ESPN /gamelog)
@@ -356,8 +357,8 @@ export async function wikiPlayer(name, lg, team) {
   const page = Object.values(intro?.query?.pages || {})[0];
   const extract = page?.extract || '';
   // sanity checks to avoid a namesake
-  if (lg === 'nba' && !/NBA|National Basketball Association/.test(extract)) return null;
-  if (lg === 'cbb') {
+  if (isPro(lg) && !(lg === 'wnba' ? /WNBA|Women's National Basketball Association/ : /NBA|National Basketball Association/).test(extract)) return null;
+  if (isCollege(lg)) {
     const school = [team?.location, team?.short, team?.nick].filter(Boolean);
     if (!school.some(s => extract.includes(s))) return null;
   }
@@ -374,11 +375,11 @@ export async function wikiPlayer(name, lg, team) {
 
 /** Team article on Wikipedia: summary + infobox facts (titles, arena, coach, history). */
 export async function wikiTeam(team, lg) {
-  const title = lg === 'nba' ? team.name : `${team.location} ${team.nick} men's basketball`;
+  const title = isPro(lg) ? team.name : `${team.location} ${team.nick} ${L(lg).women ? "women's" : "men's"} basketball`;
   let lead = await safe(wiki.lead(title));
   let used = title;
   if (!lead?.parse) {
-    const res = await safe(wiki.search(lg === 'nba' ? `${team.name} NBA team` : `${team.location} ${team.nick} men's basketball`, 3));
+    const res = await safe(wiki.search(isPro(lg) ? `${team.name} ${L(lg).name} team` : `${team.location} ${team.nick} ${L(lg).women ? "women's" : "men's"} basketball`, 3));
     const t = res?.query?.search?.[0]?.title;
     if (t) { used = t; lead = await safe(wiki.lead(t)); }
   }
@@ -390,7 +391,7 @@ export async function wikiTeam(team, lg) {
   const pick = keys => { for (const k of keys) if (ib[k]) return cleanWiki(ib[k]); return ''; };
   const facts = [];
   const add = (label, keys) => { const v = pick(keys); if (v && v.length < 400) facts.push([label, v]); };
-  if (lg === 'nba') {
+  if (isPro(lg)) {
     add('Founded', ['founded']); add('History', ['history']); add('Arena', ['arena']); add('Championships', ['championships']);
     add('Conference titles', ['conf_titles']); add('Division titles', ['div_titles']); add('Retired numbers', ['retired_numbers']);
     add('Owner', ['owner', 'owners']); add('President', ['president']); add('General manager', ['general_manager', 'gm']); add('Head coach', ['coach', 'head_coach']);

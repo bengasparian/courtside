@@ -1,4 +1,5 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
+import { L, isPro, isCollege } from './league.js';
 import { espn, repo, safe } from './api.js';
 import { seasonYear } from './ctx.js';
 import { loadRoster } from './views/players.js';
@@ -51,8 +52,8 @@ export function teamData(lg, team) {
       safe(repo(`${lg}/bpi.json`), null),
       safe(espn.schedule(lg, team.id), null),
       safe(espn.news(lg, team.id, 12), null),
-      lg === 'nba' ? safe(espn.standings('nba'), null) : safe(repo('cbb/standings.json'), null),
-      lg === 'nba' ? Promise.all([safe(repo('nba/power.json'), null), safe(repo('nba/cup.json'), null)]) : Promise.all([safe(espn.rankings(), null), safe(repo('cbb/net.json'), null)]),
+      isPro(lg) ? safe(espn.standings(lg), null) : safe(repo(`${lg}/standings.json`), null),
+      isPro(lg) ? Promise.all([safe(repo(`${lg}/power.json`), null), lg === 'nba' ? safe(repo('nba/cup.json'), null) : null]) : Promise.all([safe(espn.rankings(lg), null), safe(repo(`${lg}/net.json`), null)]),
     ]);
     const d = { year, team, ranks: ranks?.teams?.[team.id] || null, n: ranks?.n || 0, avg: ranks?.avg || {}, bpi: bpi?.teams?.[team.id] || null, bpiAll: bpi?.teams || {}, news: news?.articles || [] };
     // schedule (regular season + postseason if any)
@@ -64,8 +65,9 @@ export function teamData(lg, team) {
     }
     d.events.sort((a, b) => new Date(a.date) - new Date(b.date));
     d.liveStats = live;
-    if (lg === 'nba') {
+    if (isPro(lg)) {
       d.std = nbaStanding(standings, team.id);
+      if (lg === 'wnba' && d.std) { d.std.conf = 'WNBA'; d.std.confAbbr = 'WNBA'; }
       d.power = extra[0]?.rows?.find(r => r.id === team.id) || null;
       d.powerAll = extra[0];
       d.cup = extra[1];
@@ -106,7 +108,8 @@ export function simplifyEvent(e, teamId) {
 }
 
 function nbaStanding(st, id) {
-  for (const conf of st?.children || []) {
+  const confs = st?.children?.length ? st.children : (st?.standings ? [st] : []);
+  for (const conf of confs) {
     const entries = conf.standings?.entries || [];
     const e = entries.find(x => x.team.id === id);
     if (!e) continue;
@@ -155,10 +158,10 @@ export function scheduleFacts(events, team, lg) {
   if (worst) f.push(`Worst loss: by ${worst.them - worst.us} ${worst.home ? 'vs' : 'at'} ${worst.oppName} (${worst.us}-${worst.them}).`);
   const hi = done.reduce((m, e) => (e.us > (m?.us ?? -1) ? e : m), null);
   if (hi) f.push(`Season-high ${hi.us} points ${hi.home ? 'vs' : 'at'} ${hi.oppName}.`);
-  const s100 = lg === 'nba' ? 120 : 80;
+  const s100 = L(lg).scoreHi;
   const over = done.filter(e => e.us >= s100);
   if (over.length >= 3) f.push(`${over.filter(e => e.win).length}-${over.filter(e => !e.win).length} when scoring ${s100}+.`);
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     const vr = done.filter(e => e.oppRank);
     if (vr.length) f.push(`${vr.filter(e => e.win).length}-${vr.filter(e => !e.win).length} against AP-ranked opponents.`);
     const conf = done.filter(e => e.conf);

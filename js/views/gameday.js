@@ -1,6 +1,7 @@
 // Game Day: everything on one screen for a live broadcast.
 // Both rosters side by side (big jersey numbers), the best note per player inline, tonight's live line on every row,
 // click a row for quick notes in place, "Full card" slides out a drawer, and pregame notes collapse out of the way.
+import { L, L as LG_, isPro, isCollege } from '../league.js';
 import { esc, f1, pct, ordinal, signed, stars, fmtTime, fmtDate } from '../util.js';
 import { espn, safe } from '../api.js';
 import { state, myNotes } from '../ctx.js';
@@ -84,9 +85,9 @@ export async function gamedayTab(body, A, B, lg) {
     let proj = '';
     if (da.bpi?.bpi != null && db.bpi?.bpi != null) {
       const next = meetings.find(e => e.state !== 'post');
-      const hca = next?.neutral ? 0 : (lg === 'nba' ? 2.2 : 3.2);
+      const hca = next?.neutral ? 0 : L(lg).hca;
       const m = (db.bpi.bpi - da.bpi.bpi) + hca;
-      const pB = 1 / (1 + Math.exp(-1.7 * m / (lg === 'nba' ? 12.5 : 10.5)));
+      const pB = 1 / (1 + Math.exp(-1.7 * m / L(lg).sd));
       proj = `<div class="small"><b>Projection:</b> ${esc((m >= 0 ? B : A).abbr)} by ${Math.abs(m).toFixed(1)} · win prob ${esc(A.abbr)} ${Math.round((1 - pB) * 100)}% / ${esc(B.abbr)} ${Math.round(pB * 100)}% <span class="mut2">(BPI estimate)</span></div>`;
     }
     const series = meetings.length ? meetings.map(e => e.state === 'post' ? `<span class="${e.win ? 'good' : 'bad'}">${fmtDate(e.date, { month: 'short', day: 'numeric' })}: ${esc(A.abbr)} ${e.win ? 'W' : 'L'} ${e.us}-${e.them}</span>` : `<span class="mut">${fmtDate(e.date, { month: 'short', day: 'numeric' })}${e.note ? ' · ' + esc(e.note) : ''}</span>`).join(' · ') : '<span class="mut">No other meetings this season.</span>';
@@ -104,7 +105,7 @@ export async function gamedayTab(body, A, B, lg) {
     const { team: t, d } = s;
     const st = d.std, r = d.ranks || {}, rk = r.rk || {}, n = d.n;
     const chips = [];
-    if (lg === 'nba') {
+    if (isPro(lg)) {
       if (st) chips.push(st.overall || `${st.w}-${st.l}`, st.seed ? `${ordinal(st.seed)} ${st.confAbbr || ''}` : '', st.streak ? st.streak : '', st.last10 ? `L10 ${st.last10}` : '');
       if (d.power) chips.push(`Power #${d.power.rank}`);
     } else {
@@ -134,7 +135,7 @@ export async function gamedayTab(body, A, B, lg) {
     const L = live?.stats?.[p.id];
     if (!live || live.state === 'pre') return '';
     if (!L) return '<span class="gd-tn mut2">DNP</span>';
-    const pfCls = lg === 'nba' ? (L.pf >= 5 ? 'red' : L.pf >= 4 ? 'amber' : '') : (L.pf >= 4 ? 'red' : L.pf >= 3 ? 'amber' : '');
+    const pfCls = L.pf >= LG_(lg).foulOut - 1 ? 'red' : L.pf >= LG_(lg).foulOut - 2 ? 'amber' : '';
     return `<span class="gd-tn"><b>${L.pts}</b>p ${L.reb}r ${L.ast}a <span class="mut2">${esc(L.fg)} FG · ${esc(L.tp)} 3P · ${L.min}m</span>${L.pf ? ` <span class="chip ${pfCls}" title="Personal fouls">${L.pf} PF</span>` : ''}</span>`;
   };
 
@@ -146,10 +147,10 @@ export async function gamedayTab(body, A, B, lg) {
     if (p.birthPlace) bg.push(`From ${p.birthPlace}`);
     const hs = p.recruit?.hs || p.portal?.[0]?.hs || p.wiki?.hs;
     if (hs) bg.push(`HS: ${hs}`);
-    if (lg === 'cbb' && p.recruit?.stars) bg.push(`${stars(p.recruit.stars)} ${p.recruit.rank ? '#' + p.recruit.rank + ' ' : ''}(${p.recruit.cls})`);
-    if (lg === 'cbb' && p.schoolPath?.length > 1) bg.push(`Path: ${p.schoolPath.map(x => x.nm).join(' → ')}`);
-    if (lg === 'nba' && (p.college || p.wiki?.college)) bg.push(`College: ${p.college || p.wiki.college}`);
-    if (lg === 'nba' && p.draft) bg.push(`Draft: ${p.draft}`);
+    if (isCollege(lg) && p.recruit?.stars) bg.push(`${stars(p.recruit.stars)} ${p.recruit.rank ? '#' + p.recruit.rank + ' ' : ''}(${p.recruit.cls})`);
+    if (isCollege(lg) && p.schoolPath?.length > 1) bg.push(`Path: ${p.schoolPath.map(x => x.nm).join(' → ')}`);
+    if (isPro(lg) && (p.college || p.wiki?.college)) bg.push(`College: ${p.college || p.wiki.college}`);
+    if (isPro(lg) && p.draft) bg.push(`Draft: ${p.draft}`);
     if (p.mock) bg.push(`Mock draft #${p.mock.pick}`);
     if (p.wiki?.nickname) bg.push(`Nickname: ${p.wiki.nickname}`);
     const a = p.cur?.a, x = p.adv;
@@ -174,17 +175,17 @@ export async function gamedayTab(body, A, B, lg) {
     const line = a ? `${f1(a.avgPoints)} <span class="mut2">pts</span> ${f1(a.avgRebounds)} <span class="mut2">reb</span> ${f1(a.avgAssists)} <span class="mut2">ast</span> <span class="mut">${f1(a.fieldGoalPct)} FG · ${f1(a.threePointFieldGoalPct ?? a.threePointPct)} 3P · ${f1(a.avgMinutes)}m</span>` : `<span class="mut">${p.loaded.stats ? 'No games this season' : 'loading…'}</span>`;
     const tags = [];
     if (p.injShort) tags.push(`<span class="chip red">${esc(p.injShort)}</span>`);
-    if (lg === 'cbb' && p.recruit?.stars >= 4) tags.push(`<span class="chip amber">${p.recruit.stars}★${p.recruit.rank ? ' #' + p.recruit.rank : ''}</span>`);
-    if (lg === 'cbb' && (p.portal?.[0]?.from || p.transferFrom)) tags.push(`<span class="chip">↪ ${esc(p.portal?.[0]?.from || p.transferFrom)}</span>`);
+    if (isCollege(lg) && p.recruit?.stars >= 4) tags.push(`<span class="chip amber">${p.recruit.stars}★${p.recruit.rank ? ' #' + p.recruit.rank : ''}</span>`);
+    if (isCollege(lg) && (p.portal?.[0]?.from || p.transferFrom)) tags.push(`<span class="chip">↪ ${esc(p.portal?.[0]?.from || p.transferFrom)}</span>`);
     if (p.mock) tags.push(`<span class="chip green">Mock #${p.mock.pick}</span>`);
-    if (lg === 'nba' && p.expYears === 0) tags.push('<span class="chip amber">Rookie</span>');
+    if (isPro(lg) && p.expYears === 0) tags.push('<span class="chip amber">Rookie</span>');
     const isOpen = expanded.has(p.id);
     return `<div class="gd-row ${isOpen ? 'open' : ''}" data-pid="${p.id}" data-no="${esc(p.jersey ?? '')}" data-side="${key}">
       <div class="gd-main">
         <div class="gd-no">${esc(p.jersey ?? '–')}</div>
         <img class="gd-hs" src="${esc(p.headshot || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
         <div class="gd-who"><div class="gd-pn">${esc(p.name)} ${tags.join(' ')}</div>
-          <div class="gd-bio">${esc([p.pos, p.ht, lg === 'cbb' ? p.exp : (p.age ? 'Age ' + p.age : ''), p.wt].filter(Boolean).join(' · '))}</div>
+          <div class="gd-bio">${esc([p.pos, p.ht, isCollege(lg) ? p.exp : (p.age ? 'Age ' + p.age : ''), p.wt].filter(Boolean).join(' · '))}</div>
           <div class="gd-line">${line}</div>
           <div class="gd-live-line" data-live="${p.id}">${liveCell(p)}</div>
           <div class="gd-one">${esc(oneLiner(p, ros))}</div></div>

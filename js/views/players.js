@@ -1,4 +1,5 @@
 // Player notes: load every player on a roster (progressively) and render full commentator cards.
+import { L, isPro, isCollege, draftLeague } from '../league.js';
 import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js';
 import { espn, repo, safe } from '../api.js';
 import { state, myNotes, teams, seasonYear, paint } from '../ctx.js';
@@ -11,10 +12,10 @@ let extrasCache = {};
 async function extras(lg) {
   if (extrasCache[lg]) return extrasCache[lg];
   const [draft, recruits, portal, leaders] = await Promise.all([
-    safe(repo('draft.json', 3600), null),
-    lg === 'cbb' ? safe(repo('cbb/recruits.json', 3600), null) : null,
-    lg === 'cbb' ? safe(repo('cbb/portal.json', 3600), null) : null,
-    lg === 'nba' ? safe(repo('nba/leaders.json', 1800), null) : null,
+    safe(repo(draftLeague(lg) === 'nba' ? 'draft.json' : 'wnba/draft.json', 3600), null),
+    isCollege(lg) ? safe(repo(`${lg}/recruits.json`, 3600), null) : null,
+    isCollege(lg) ? safe(repo(`${lg}/portal.json`, 3600), null) : null,
+    isPro(lg) ? safe(repo(`${lg}/leaders.json`, 1800), null) : null,
   ]);
   const mock = {}, board = {};
   for (const r of draft?.mock || []) mock[normName(r.name)] = r;
@@ -42,7 +43,7 @@ function fromRoster(a, team, lg) {
 /** Load roster + all per-player details. onUpdate(player) fires as each piece arrives. */
 export async function loadRoster(lg, team, { onUpdate, onRoster } = {}) {
   const [ros, tsJs, year, X] = await Promise.all([espn.roster(lg, team.id), safe(espn.teamStats(lg, team.id), null), seasonYear(lg), extras(lg)]);
-  const tm = teamTotals(tsJs, lg === 'nba' ? 240 : 200);
+  const tm = teamTotals(tsJs, L(lg).mins);
   const players = (ros.athletes || []).flatMap(g => (g.items ? g.items : [g])).map(a => fromRoster(a, team, lg));
   const coach = (ros.coach || [])[0];
   players.forEach(p => {
@@ -71,7 +72,7 @@ async function enrich(p, ctx, onUpdate) {
   p.prev = prevRows.sort((a, b) => b.year - a.year || (b.a.gamesPlayed - a.a.gamesPlayed))[0] || null;
   const TB = state._teamsById?.[lg] || {};
   if (p.prev && p.prev.teamId !== team.id) p.prevSchool = TB[p.prev.teamId]?.short || TB[p.prev.teamId]?.name || '';
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     const path = [];
     for (const s of (p.parsed?.seasons || []).slice().sort((a, b) => a.year - b.year)) {
       const nm = TB[s.teamId]?.short || TB[s.teamId]?.name || (s.teamSlug || '').replace(/-/g, ' ');
@@ -80,10 +81,10 @@ async function enrich(p, ctx, onUpdate) {
     p.schoolPath = path;
     p.transferFrom = path.length > 1 ? path[path.length - 2].nm : null;
   }
-  if (p.adv && lg === 'nba' && X.per[p.id]) { p.adv.per = X.per[p.id].per; p.adv.perRank = X.per[p.id].rank; }
+  if (p.adv && isPro(lg) && X.per[p.id]) { p.adv.per = X.per[p.id].per; p.adv.perRank = X.per[p.id].rank; }
   p.loaded.stats = true;
   // college extras (no requests)
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     const k = normName(p.name);
     p.recruit = X.recruits[k] || null;
     const pt = X.portal[k];
@@ -151,7 +152,7 @@ function tags(p, lg) {
   if (p.injShort) t.push(`<span class="chip red" title="${esc(p.injury)}">⚕ ${esc(p.injShort)}</span>`);
   const a = p.cur?.a;
   if (a?.gamesPlayed) t.push(a.gamesStarted / a.gamesPlayed >= 0.5 ? '<span class="chip acc">Starter</span>' : '<span class="chip">Bench</span>');
-  if (lg === 'cbb') {
+  if (isCollege(lg)) {
     if (p.recruit?.stars) t.push(`<span class="chip amber" title="On3 Industry ranking">${stars(p.recruit.stars)} ${p.recruit.rank ? '#' + p.recruit.rank + ' in ' + p.recruit.cls : p.recruit.cls + ' class'}</span>`);
     const tr = p.portal?.[0];
     if (tr?.from) t.push(`<span class="chip">↪ Transfer from ${esc(tr.from)}</span>`);
@@ -159,16 +160,16 @@ function tags(p, lg) {
     if (p.mock) t.push(`<span class="chip green">Mock draft: #${p.mock.pick}${p.mock.team ? ' (' + esc(p.mock.team) + ')' : ''}</span>`);
     else if (p.board) t.push(`<span class="chip green">Big board #${p.board.pick}</span>`);
   }
-  if (lg === 'nba') {
+  if (isPro(lg)) {
     if (p.expYears === 0) t.push('<span class="chip amber">Rookie</span>');
     if (p.adv?.perRank && p.adv.perRank <= 25) t.push(`<span class="chip green">PER ${f1(p.adv.per)} (${ordinal(p.adv.perRank)} NBA)</span>`);
   }
-  for (const r of (p.ranks || []).filter(r => r.rank <= (lg === 'nba' ? 10 : 25)).slice(0, 2)) t.push(`<span class="chip green">${esc(r.rankDisplayValue)} ${esc(r.abbreviation || r.shortDisplayName)}</span>`);
+  for (const r of (p.ranks || []).filter(r => r.rank <= (isPro(lg) ? 10 : 25)).slice(0, 2)) t.push(`<span class="chip green">${esc(r.rankDisplayValue)} ${esc(r.abbreviation || r.shortDisplayName)}</span>`);
   return t.join('');
 }
 
 function bioLine(p, lg) {
-  return [p.posName || p.pos, p.ht, p.wt, p.age ? `Age ${p.age}` : '', lg === 'cbb' ? p.exp : (p.expStr || p.exp), p.birthPlace ? `From ${p.birthPlace}` : ''].filter(Boolean).map(esc).join(' · ');
+  return [p.posName || p.pos, p.ht, p.wt, p.age ? `Age ${p.age}` : '', isCollege(lg) ? p.exp : (p.expStr || p.exp), p.birthPlace ? `From ${p.birthPlace}` : ''].filter(Boolean).map(esc).join(' · ');
 }
 
 export function cardHTML(p, lg, roster, { collapsed = false } = {}) {
@@ -186,14 +187,14 @@ function seasonsTable(p, lg) {
   const seasons = p.parsed?.seasons || [];
   if (!seasons.length) return '<div class="small mut">No stats on file.</div>';
   const T = (state._teamsById?.[lg]) || {};
-  const rows = lg === 'cbb' ? seasons.slice().reverse() : seasons.slice(-3).reverse();
+  const rows = isCollege(lg) ? seasons.slice().reverse() : seasons.slice(-3).reverse();
   const teamAbbr = s => { const t = T[s.teamId]; return t ? t.abbr : (s.teamSlug || '').split('-').map(w => w[0]).join('').toUpperCase(); };
   return `<div class="tscroll"><table class="minitable"><thead><tr><th>Season</th>${statCols.map(c => `<th>${c[0]}</th>`).join('')}</tr></thead><tbody>
     ${rows.map(s => statRow(`${esc(s.label || s.year)} <span class="mut2">${esc(teamAbbr(s))}</span>`, s.a, s === p.cur ? 'b' : '')).join('')}
     ${p.career ? statRow('<b>Career</b>', p.career) : ''}
     </tbody></table></div>
-    ${lg === 'nba' && seasons.length > 3 ? `<details class="small" style="margin-top:6px"><summary class="link">All ${seasons.length} seasons</summary><div class="tscroll"><table class="minitable"><tbody>${seasons.slice().reverse().map(s => statRow(`${esc(s.label)} <span class="mut2">${esc(teamAbbr(s))}</span>`, s.a)).join('')}</tbody></table></div></details>` : ''}
-    ${p.careerTot && lg === 'nba' ? `<div class="small mut" style="margin-top:6px">Career totals: <b>${f0n(p.careerTot.points)}</b> pts · ${f0n(p.careerTot.totalRebounds)} reb · ${f0n(p.careerTot.assists)} ast · ${f0n(p.careerTot.threePointFieldGoalsMade)} 3PM${p.careerMisc?.doubleDouble ? ` · ${f0n(p.careerMisc.doubleDouble)} double-doubles` : ''}${p.careerMisc?.tripleDouble ? ` · ${f0n(p.careerMisc.tripleDouble)} triple-doubles` : ''}</div>` : ''}`;
+    ${isPro(lg) && seasons.length > 3 ? `<details class="small" style="margin-top:6px"><summary class="link">All ${seasons.length} seasons</summary><div class="tscroll"><table class="minitable"><tbody>${seasons.slice().reverse().map(s => statRow(`${esc(s.label)} <span class="mut2">${esc(teamAbbr(s))}</span>`, s.a)).join('')}</tbody></table></div></details>` : ''}
+    ${p.careerTot && isPro(lg) ? `<div class="small mut" style="margin-top:6px">Career totals: <b>${f0n(p.careerTot.points)}</b> pts · ${f0n(p.careerTot.totalRebounds)} reb · ${f0n(p.careerTot.assists)} ast · ${f0n(p.careerTot.threePointFieldGoalsMade)} 3PM${p.careerMisc?.doubleDouble ? ` · ${f0n(p.careerMisc.doubleDouble)} double-doubles` : ''}${p.careerMisc?.tripleDouble ? ` · ${f0n(p.careerMisc.tripleDouble)} triple-doubles` : ''}</div>` : ''}`;
 }
 const f0n = v => (v == null ? '–' : Math.round(v).toLocaleString());
 
@@ -201,7 +202,7 @@ function advHTML(p, lg) {
   const x = p.adv;
   if (!x) return '<div class="small mut">Needs at least one game this season.</div>';
   const k = (key, v, sub) => `<div class="kpi"><div class="k">${GLOSSARY[key].label}${q(key, lg)}</div><div class="v">${v}</div>${sub ? `<div class="r">${sub}</div>` : ''}</div>`;
-  const pm = lg === 'nba' ? 36 : 40;
+  const pm = L(lg).per;
   const small = (p.cur?.a?.gamesPlayed || 0) < 5 ? `<div class="small warn" style="margin-bottom:6px">Small sample: ${p.cur?.a?.gamesPlayed} game${p.cur?.a?.gamesPlayed === 1 ? '' : 's'} this season.</div>` : '';
   return `${small}<div class="adv">
     ${k('ts', pct(x.ts), tsTier(x.ts, lg))}
@@ -216,7 +217,7 @@ function advHTML(p, lg) {
     ${x.per != null ? k('per', f1(x.per), x.perRank ? ordinal(x.perRank) + ' in NBA' : '') : ''}
   </div>
   ${x.p36 ? `<div class="small mut" style="margin-top:6px">Per ${pm} min: ${f1(x.p36.pts)} pts · ${f1(x.p36.reb)} reb · ${f1(x.p36.ast)} ast · ${f1(x.p36.stl)} stl · ${f1(x.p36.blk)} blk</div>` : ''}
-  ${(p.ranks || []).length ? `<div class="small" style="margin-top:6px"><span class="mut">${lg === 'nba' ? 'League' : 'National'} ranks:</span> ${(p.ranks).slice(0, 6).map(r => `${esc(r.abbreviation || r.shortDisplayName)} ${esc(r.rankDisplayValue)}`).join(' · ')}</div>` : ''}`;
+  ${(p.ranks || []).length ? `<div class="small" style="margin-top:6px"><span class="mut">${isPro(lg) ? 'League' : 'National'} ranks:</span> ${(p.ranks).slice(0, 6).map(r => `${esc(r.abbreviation || r.shortDisplayName)} ${esc(r.rankDisplayValue)}`).join(' · ')}</div>` : ''}`;
 }
 
 function backgroundHTML(p, lg) {
@@ -226,21 +227,21 @@ function backgroundHTML(p, lg) {
   if (p.wiki?.nickname) add('Nickname', esc(p.wiki.nickname));
   const hs = p.recruit?.hs || p.portal?.[0]?.hs || p.wiki?.hs;
   add('High school', esc(hs ? hs + (p.recruit?.hometown ? ` (${p.recruit.hometown})` : '') : ''));
-  if (lg === 'cbb' && p.recruit) add('Recruiting', `${stars(p.recruit.stars)} ${p.recruit.rating ? '(' + f1(p.recruit.rating) + ') ' : ''}Class of ${p.recruit.cls}${p.recruit.rank ? ` · <b>#${p.recruit.rank}</b> nationally` : ''}${p.recruit.posRank ? ` · #${p.recruit.posRank} ${esc(p.recruit.pos || '')}` : ''}${p.recruit.stateRank ? ` · #${p.recruit.stateRank} in ${esc(p.recruit.state || 'state')}` : ''} <span class="mut2">(On3 Industry)</span>`);
-  if (lg === 'cbb' && p.schoolPath?.length > 1) add('College path', p.schoolPath.map(x => `${esc(x.nm)} (${x.from - 1}-${String(x.to).slice(2)})`).join(' → '));
-  if (lg === 'cbb' && p.portal?.length) {
+  if (isCollege(lg) && p.recruit) add('Recruiting', `${stars(p.recruit.stars)} ${p.recruit.rating ? '(' + f1(p.recruit.rating) + ') ' : ''}Class of ${p.recruit.cls}${p.recruit.rank ? ` · <b>#${p.recruit.rank}</b> nationally` : ''}${p.recruit.posRank ? ` · #${p.recruit.posRank} ${esc(p.recruit.pos || '')}` : ''}${p.recruit.stateRank ? ` · #${p.recruit.stateRank} in ${esc(p.recruit.state || 'state')}` : ''} <span class="mut2">(On3 Industry)</span>`);
+  if (isCollege(lg) && p.schoolPath?.length > 1) add('College path', p.schoolPath.map(x => `${esc(x.nm)} (${x.from - 1}-${String(x.to).slice(2)})`).join(' → '));
+  if (isCollege(lg) && p.portal?.length) {
     const hist = p.portal[0].history?.length ? p.portal[0].history.map(h => `${esc(h.team)} (${h.from}${h.to && h.to !== h.from ? '–' + String(h.to).slice(2) : ''})`).join(' → ') : '';
     add('Transfer', p.portal.map(e => `${e.year} portal: ${esc(e.from || '?')} → <b>${esc(e.to || 'uncommitted')}</b>${e.stars ? ` · ${stars(e.stars)} transfer${e.rank ? ' #' + e.rank : ''}` : ''}`).join('<br>') + (hist ? `<br><span class="mut">Path: ${hist}</span>` : ''));
   }
-  if (lg === 'nba') {
-    add('College / pre-NBA', esc(p.college || p.wiki?.college || ''));
+  if (isPro(lg)) {
+    add(`College / pre-${L(lg).name}`, esc(p.college || p.wiki?.college || ''));
     add('Draft', esc(p.draft || p.wiki?.draft || ''));
-    if (p.debut) add('NBA debut', `${p.debut}-${String(p.debut + 1).slice(2)} season${p.expStr ? ' · ' + esc(p.expStr) : ''}`);
+    if (p.debut) add(`${L(lg).name} debut`, `${lg === 'wnba' ? p.debut : `${p.debut}-${String(p.debut + 1).slice(2)}`} season${p.expStr ? ' · ' + esc(p.expStr) : ''}`);
     if (p.contract?.salary) add('Salary', `$${(p.contract.salary / 1e6).toFixed(1)}M (${p.contract.season?.year - 1}-${String(p.contract.season?.year).slice(2)})${p.contracts.length > 1 ? ` · on ESPN file for ${p.contracts.length} seasons` : ''}`);
   }
   if (p.mock || p.board) {
     const d = p.mock || p.board;
-    add('NBA draft outlook', `${p.mock ? `Tankathon mock draft: <b>#${p.mock.pick}</b>${p.mock.team ? ' to ' + esc(p.mock.team) : ''}` : ''}${p.mock && p.board ? ' · ' : ''}${p.board ? `Big board <b>#${p.board.pick}</b>` : ''}${d.stats?.advanced ? ` · BPM ${esc(d.stats.advanced.bpm || '–')}, USG ${esc(d.stats.advanced.usg || '–')}` : ''}`);
+    add(`${L(lg).women ? 'WNBA' : 'NBA'} draft outlook`, `${p.mock ? `Tankathon mock draft: <b>#${p.mock.pick}</b>${p.mock.team ? ' to ' + esc(p.mock.team) : ''}` : ''}${p.mock && p.board ? ' · ' : ''}${p.board ? `Big board <b>#${p.board.pick}</b>` : ''}${d.stats?.advanced ? ` · BPM ${esc(d.stats.advanced.bpm || '–')}, USG ${esc(d.stats.advanced.usg || '–')}` : ''}`);
   }
   if (p.injury) add('Injury', `<span class="inj">${esc(p.injury)}</span>`);
   const wikiTxt = p.wiki?.extract ? `<p class="small" style="margin:8px 0 0">${esc(p.wiki.extract)} <a class="link" href="${esc(p.wiki.url)}" target="_blank" rel="noopener">Wikipedia</a></p>` : (p.loaded.wiki ? '' : '<div class="small mut2">Looking up background…</div>');
@@ -278,7 +279,7 @@ export function bodyHTML(p, lg, roster) {
     <section><h4 class="h3">Recent games</h4>${gamesHTML(p)}</section>
     <section><h4 class="h3">Latest news</h4>${newsHTML(p)}</section>
     <section><h4 class="h3">My notes <span class="mut2" style="text-transform:none;letter-spacing:0;font-weight:500">(saved in this browser)</span></h4><textarea class="mynotes" data-key="${esc(key)}" placeholder="Pronunciation, storylines, stats to mention…">${esc(myNotes.get(key))}</textarea>
-      <div class="small" style="margin-top:6px"><a class="link" href="https://www.espn.com/${lg === 'nba' ? 'nba' : 'mens-college-basketball'}/player/_/id/${p.id}" target="_blank" rel="noopener">ESPN profile</a> · <a class="link" href="#/${lg}/player/${p.id}/${p.teamId}">Open full page</a></div></section>`;
+      <div class="small" style="margin-top:6px"><a class="link" href="https://www.espn.com/${L(lg).espn}/player/_/id/${p.id}" target="_blank" rel="noopener">ESPN profile</a> · <a class="link" href="#/${lg}/player/${p.id}/${p.teamId}">Open full page</a></div></section>`;
 }
 
 /** Wire up a container of cards: expand/collapse, notes autosave. */
