@@ -1,14 +1,14 @@
 // Matchup prep (two teams) and single-team pages.
-import { L, isPro, isCollege } from '../league.js?v=653f72bd97';
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=653f72bd97';
-import { espn, safe } from '../api.js?v=653f72bd97';
-import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=653f72bd97';
-import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=653f72bd97';
-import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=653f72bd97';
-import { kpi, q, newsList, rankCls } from './common.js?v=653f72bd97';
-import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=653f72bd97';
-import { onLeave } from '../app.js?v=653f72bd97';
-import { gamedayTab } from './gameday.js?v=653f72bd97';
+import { L, isPro, isCollege } from '../league.js?v=1b38886051';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js?v=1b38886051';
+import { espn, safe } from '../api.js?v=1b38886051';
+import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js?v=1b38886051';
+import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js?v=1b38886051';
+import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js?v=1b38886051';
+import { kpi, q, newsList, rankCls } from './common.js?v=1b38886051';
+import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js?v=1b38886051';
+import { onLeave } from '../app.js?v=1b38886051';
+import { gamedayTab } from './gameday.js?v=1b38886051';
 
 // ------------------------------------------------------------------------------------------------ single team page
 export async function renderTeam(app, lg, id, params) {
@@ -196,7 +196,7 @@ async function teamTab(body, team, lg) {
     mini.innerHTML = `<div class="row"><h3 class="h3" style="margin:0">Roster</h3><span class="sp"></span><a class="link small" href="${/\/matchup\/\d+\/\d+\/(a|b)$/.test(location.hash) ? location.hash + '-players' : `#/${lg}/team/${team.id}?tab=players`}">Full player notes →</a></div>
       <div class="tscroll"><table class="minitable" style="margin-top:6px"><thead><tr><th>#</th><th>Player</th><th>Pos</th><th>Ht</th><th>PTS</th><th>REB</th><th>AST</th><th>MIN</th></tr></thead><tbody>
       ${list.map(p => `<tr><td>${esc(p.jersey ?? '')}</td><td class="l"><a href="#/${lg}/player/${p.id}/${team.id}">${esc(p.name)}</a>${p.injShort ? ` <span class="inj tiny">${esc(p.injShort)}</span>` : ''}</td><td>${esc(p.pos || '')}</td><td>${esc(p.ht || '')}</td><td>${f1(p.cur?.a?.avgPoints)}</td><td>${f1(p.cur?.a?.avgRebounds)}</td><td>${f1(p.cur?.a?.avgAssists)}</td><td>${f1(p.cur?.a?.avgMinutes)}</td></tr>`).join('')}
-      </tbody></table></div>${ros.coach ? `<div class="small mut" style="margin-top:6px">Head coach: <b>${esc(ros.coach.firstName)} ${esc(ros.coach.lastName)}</b>${ros.coach.experience ? ` (${ros.coach.experience} yrs)` : ''}</div>` : ''}`;
+      </tbody></table></div>${ros.coach ? `<div class="small mut" style="margin-top:6px">Head coach: <b>${esc(ros.coach.firstName)} ${esc(ros.coach.lastName)}</b></div>` : ''}`;
   };
   drawRoster();
   const drawCoach = async () => {

@@ -1,8 +1,8 @@
-import { L, isPro, isCollege } from '../league.js?v=653f72bd97';
-import { esc, logoFor, ymd } from '../util.js?v=653f72bd97';
-import { espn, repo, safe } from '../api.js?v=653f72bd97';
-import { state, teams, favs, recents } from '../ctx.js?v=653f72bd97';
-import { gameCard, newsList, gameStatus } from './common.js?v=653f72bd97';
+import { L, isPro, isCollege } from '../league.js?v=1b38886051';
+import { esc, logoFor, ymd } from '../util.js?v=1b38886051';
+import { espn, repo, safe } from '../api.js?v=1b38886051';
+import { state, teams, favs, recents } from '../ctx.js?v=1b38886051';
+import { gameCard, newsList, gameStatus } from './common.js?v=1b38886051';
 
 export async function render(app, lg) {
   const T = await teams(lg);
