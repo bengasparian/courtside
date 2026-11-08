@@ -32,7 +32,7 @@ async function league(app, params) {
     const b = await safe(repo(`${CL}/bpi.json`), null);
     const rows = Object.entries(b?.teams || {}).sort((x, y) => (x[1].bpirank || 999) - (y[1].bpirank || 999)).slice(0, 100);
     el.innerHTML = `<div class="card flush"><div class="tscroll"><table class="t" id="bt"><thead><tr><th data-k="r">BPI rk</th><th>Team</th><th>Conf</th><th data-k="w">W-L</th><th data-k="b">BPI${q('bpi', CL)}</th><th>Off</th><th>Def</th><th data-k="sor">SOR${q('sor', CL)}</th><th>Proj seed</th><th>Sweet 16</th><th>Final Four</th><th>Title</th></tr></thead><tbody>
-      ${rows.map(([id, s]) => `<tr data-r="${s.bpirank}" data-b="${s.bpi}" data-sor="${s.sorrank || 999}" data-w="${s.wins}"><td class="l b">${s.bpirank}</td><td class="l">${teamCell(T.byId[id], CL)}</td><td class="small mut">${esc(T.byId[id]?.confAbbr || '')}</td><td>${s.wins}-${s.losses}</td><td class="b">${signed(s.bpi)}</td><td>${signed(s.bpioffense)}</td><td>${signed(s.bpidefense)}</td><td>${s.sorrank || '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td><td>${pct(s.chancesweet16, 0)}</td><td>${pct(s.chancefinal4, 1)}</td><td>${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">ESPN Basketball Power Index, top 100. Click a column header to sort.</div>`;
+      ${rows.map(([id, s]) => `<tr data-r="${s.bpirank}" data-b="${s.bpi}" data-sor="${s.sorrank || 999}" data-w="${s.wins}"><td class="l b">${s.bpirank}</td><td class="l">${teamCell(T.byId[id], CL)}</td><td class="small mut">${esc(T.byId[id]?.confAbbr || '')}</td><td>${s.wins}-${s.losses}</td><td class="b">${signed(s.bpi)}</td><td>${signed(s.bpioffense)}</td><td>${signed(s.bpidefense)}</td><td>${s.sorrank || '–'}</td><td>${s.projectedtournamentseed ? Math.round(s.projectedtournamentseed) : '–'}</td><td>${pct(s.chancesweet16, 0)}</td><td>${pct(s.chancefinal4, 1)}</td><td>${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div></div><div class="src">ESPN Basketball Power Index${rows.length < 50 ? ` (ESPN publishes only its top ${rows.length} for ${esc(L(CL).full)})` : ', top 100'}. Click a column header to sort.</div>`;
     sortable(el.querySelector('#bt'));
   } else if (tab === 'net') {
     const [n, year] = await Promise.all([safe(repo(`${CL}/net.json`), null), seasonYear(CL)]);
@@ -73,8 +73,17 @@ async function conferences(app, params) {
 }
 
 async function madness(app) {
-  const [b, year, n] = await Promise.all([safe(repo(`${CL}/bpi.json`), null), seasonYear(CL), safe(espn.news(CL, null, 50), null)]);
-  const B = b?.teams || {};
+  const [b, year, n, ts] = await Promise.all([safe(repo(`${CL}/bpi.json`), null), seasonYear(CL), safe(espn.news(CL, null, 50), null), safe(repo(`${CL}/teamstats.json`), null)]);
+  let B = b?.teams || {};
+  let basis = 'ESPN BPI';
+  if (Object.keys(B).length < 100 && ts?.teams) {
+    // ESPN doesn't publish a full index for this league: rank every team by net rating instead (keep BPI odds where they exist)
+    basis = 'net rating';
+    const rows = Object.entries(ts.teams).filter(([, t]) => t.net != null && t.gp >= 1).sort((x, y) => y[1].net - x[1].net);
+    const nb = {};
+    rows.forEach(([id, t], i) => { const st = B[id] || {}; nb[id] = { ...st, bpirank: i + 1, wins: st.wins ?? null, losses: st.losses ?? null, _net: t.net }; });
+    B = nb;
+  }
   let field = Object.entries(B).filter(([, s]) => s.projectedtournamentseed).sort((x, y) => (x[1].projectedtournamentorder || x[1].projectedtournamentseed * 4) - (y[1].projectedtournamentorder || y[1].projectedtournamentseed * 4));
   let own = false;
   if (field.length < 40) {
@@ -115,16 +124,16 @@ async function madness(app) {
   app.innerHTML = `<div class="row wrap"><h1 class="h1">March Madness ${year}</h1><span class="sp"></span><span class="small mut">Selection Sunday is mid-March; projections update every 2 hours</span></div>
     ${bracket}
     <div class="grid g-side" style="margin-top:12px">
-      <div class="card flush"><div class="card-h"><h3 class="h3">Projected field by seed (${own ? 'Courtside projection from ESPN BPI' : 'ESPN BPI'})</h3><span class="small mut">${field.length} teams</span></div><div class="tscroll"><table class="t"><thead><tr><th>Seed</th><th>Teams</th></tr></thead><tbody>
-        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], CL)}<span class="tiny mut">${s.wins}-${s.losses}${s.auto ? ' · auto' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
+      <div class="card flush"><div class="card-h"><h3 class="h3">Projected field by seed (${own ? `Courtside projection from ${basis}` : 'ESPN BPI'})</h3><span class="small mut">${field.length} teams</span></div><div class="tscroll"><table class="t"><thead><tr><th>Seed</th><th>Teams</th></tr></thead><tbody>
+        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], CL)}<span class="tiny mut">${s.wins != null ? `${s.wins}-${s.losses}` : (s._net != null ? signed(s._net) + ' net' : '')}${s.auto ? ' · auto' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
       </tbody></table></div></div>
       <div class="grid" style="align-content:start">
-        <div class="card flush"><div class="card-h"><h3 class="h3">Best teams projected out</h3></div><table class="t"><tbody>${out.map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], CL)}</td><td>${s.wins}-${s.losses}</td><td class="small mut">BPI #${s.bpirank}</td></tr>`).join('')}</tbody></table></div>
+        <div class="card flush"><div class="card-h"><h3 class="h3">Best teams projected out</h3></div><table class="t"><tbody>${out.map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], CL)}</td><td>${s.wins != null ? `${s.wins}-${s.losses}` : ''}</td><td class="small mut">${basis === 'ESPN BPI' ? 'BPI' : 'Net rtg'} #${s.bpirank}</td></tr>`).join('')}</tbody></table></div>
         <div class="card flush"><div class="card-h"><h3 class="h3">Title favorites</h3></div><table class="t"><thead><tr><th>Team</th><th>F4</th><th>Title</th></tr></thead><tbody>${Object.entries(B).sort((x, y) => (y[1].chancencaachampion || 0) - (x[1].chancencaachampion || 0)).slice(0, 12).map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], CL)}</td><td>${pct(s.chancefinal4, 1)}</td><td class="b">${pct(s.chancencaachampion, 1)}</td></tr>`).join('')}</tbody></table></div>
         <div class="card"><h3 class="h3">Bracket &amp; bubble news</h3>${newsList(madNews.length ? madNews : n?.articles, { limit: 6 })}</div>
       </div>
     </div>
-    <div class="src">${own ? 'ESPN has not published seed projections yet this season, so this field is built from BPI rankings: the top BPI team in each conference takes the automatic bid ("auto"), the best remaining teams fill the 68 at-large spots, and seeds follow the S-curve. It switches to ESPN\'s own projections once they appear.' : 'Seeds and odds are ESPN BPI projections (automatic bids included), not the committee\'s bracket.'} The NCAA's NET ranking is the committee's main sorting tool: see Rankings → NET.</div>`;
+    <div class="src">${own ? `ESPN has not published seed projections${basis === 'net rating' ? ` (and has no full power index for ${L(CL).full})` : ' yet this season'}, so this field is built from ${basis === 'net rating' ? 'each team\'s net rating (points per 100 possessions, not adjusted for schedule, so it\'s noisy early in the season)' : 'BPI rankings'}: the top-rated team in each conference takes the automatic bid ("auto"), the best remaining teams fill the 68 at-large spots, and seeds follow the S-curve. It switches to ESPN\'s own projections once they appear.` : 'Seeds and odds are ESPN BPI projections (automatic bids included), not the committee\'s bracket.'} The NCAA's NET ranking is the committee's main sorting tool: see Rankings → NET.</div>`;
   void ymd; void fmtDate; void f1;
 }
 

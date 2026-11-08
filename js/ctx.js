@@ -75,3 +75,23 @@ export function toast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 2200);
 }
+
+// favorites + recent matchups (saved in this browser)
+const lsGet = (k, d) => { try { return JSON.parse(localStorage.getItem(k) || 'null') ?? d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } };
+export const favs = {
+  list(lg) { return lsGet('cs-fav', []).filter(x => x.startsWith(lg + ':')).map(x => x.split(':')[1]); },
+  has(lg, id) { return lsGet('cs-fav', []).includes(`${lg}:${id}`); },
+  toggle(lg, id) { const a = lsGet('cs-fav', []); const k = `${lg}:${id}`; const i = a.indexOf(k); if (i >= 0) a.splice(i, 1); else a.push(k); lsSet('cs-fav', a); return i < 0; },
+};
+export const recents = {
+  add(lg, a, b) { const r = lsGet('cs-recent', []).filter(x => !(x.lg === lg && x.a === a && x.b === b)); r.unshift({ lg, a, b, t: Date.now() }); lsSet('cs-recent', r.slice(0, 20)); },
+  list(lg) { return lsGet('cs-recent', []).filter(x => x.lg === lg).slice(0, 8); },
+  clear(lg) { lsSet('cs-recent', lsGet('cs-recent', []).filter(x => x.lg !== lg)); },
+};
+
+export const pron = {
+  get(lg, id) { try { return localStorage.getItem(`cs-pron:${lg}:${id}`) || ''; } catch { return ''; } },
+  set(lg, id, v) { try { if (v) localStorage.setItem(`cs-pron:${lg}:${id}`, v); else localStorage.removeItem(`cs-pron:${lg}:${id}`); } catch { /* ignore */ } },
+};
+export const sayName = (p, lg) => pron.get(lg, p.id) || p.wiki?.pron || '';

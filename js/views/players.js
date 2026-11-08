@@ -2,7 +2,7 @@
 import { L, isPro, isCollege, draftLeague } from '../league.js';
 import { esc, f1, pct, ordinal, num, stars, normName, logoFor } from '../util.js';
 import { espn, repo, safe } from '../api.js';
-import { state, myNotes, teams, seasonYear, paint } from '../ctx.js';
+import { state, myNotes, teams, seasonYear, paint, sayName } from '../ctx.js';
 import { parseAthleteStats, currentSeason, advanced, playStyle, roleNotes, factNotes, parseGamelog, wikiPlayer, teamTotals, tsTier, usgTier, GLOSSARY } from '../notes.js';
 import { q } from './common.js';
 
@@ -176,7 +176,7 @@ export function cardHTML(p, lg, roster, { collapsed = false } = {}) {
   return `<article class="pc ${collapsed ? 'collapsed' : ''}" data-pid="${p.id}">
     <div class="pc-h" title="Click to show / hide full notes">
       <div class="row" style="gap:10px"><div class="no">${esc(p.jersey ?? '')}</div><img class="hs" src="${esc(p.headshot || '')}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"></div>
-      <div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="bio">${bioLine(p, lg)}</div><div class="tags">${tags(p, lg)}</div></div>
+      <div style="min-width:0"><div class="nm">${esc(p.name)}${sayName(p, lg) ? ` <span class="gd-say" style="font-family:var(--font);text-transform:none;letter-spacing:0">🔊 ${esc(sayName(p, lg))}</span>` : ''}</div><div class="bio">${bioLine(p, lg)}</div><div class="tags">${tags(p, lg)}</div></div>
       ${headerLine(p)}
     </div>
     <div class="pc-b">${collapsed ? '' : bodyHTML(p, lg, roster)}</div>

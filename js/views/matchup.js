@@ -2,8 +2,8 @@
 import { L, isPro, isCollege } from '../league.js';
 import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, num, stars } from '../util.js';
 import { espn, safe } from '../api.js';
-import { state, teams, paint, myNotes, seasonYear } from '../ctx.js';
-import { teamData, roster, history, teamWiki, scheduleFacts } from '../teamdata.js';
+import { state, teams, paint, myNotes, seasonYear, favs, recents, toast, sayName } from '../ctx.js';
+import { teamData, roster, history, teamWiki, scheduleFacts, coachProfile, lastMeeting } from '../teamdata.js';
 import { teamStyle, playStyle, roleNotes, factNotes, GLOSSARY } from '../notes.js';
 import { kpi, q, newsList, rankCls } from './common.js';
 import { cardHTML, bodyHTML, headerLine, wireCards } from './players.js';
@@ -25,6 +25,11 @@ export async function renderTeam(app, lg, id, params) {
       <span class="sp"></span><a href="#/${lg}" class="mut">Compare with another team →</a>
     </div><div id="body"></div>`;
   const body = app.querySelector('#body');
+  app.querySelector('[data-fav]')?.addEventListener('click', e => {
+    const on = favs.toggle(lg, team.id);
+    e.currentTarget.classList.toggle('on', on); e.currentTarget.textContent = on ? '★' : '☆';
+    toast(on ? `${team.short || team.name} added to favorites` : 'Removed from favorites');
+  });
   fillHeader(app, team, lg);
   if (tab === 'players') playersTab(body, team, lg);
   else teamTab(body, team, lg);
@@ -38,6 +43,7 @@ export async function render(app, lg, aId, bId, tab) {
   const A = T.byId[aId], B = T.byId[bId];
   if (!A || !B) { app.innerHTML = '<div class="err">One of these teams could not be found.</div>'; return; }
   const root = document.documentElement;
+  recents.add(lg, A.id, B.id);
   paint(root, A, 'a'); paint(root, B, 'b');
   paint(root, tab === 'b' || tab === 'b-players' ? B : A, 'acc');
   const base = `#/${lg}/matchup/${aId}/${bId}`;
@@ -88,7 +94,8 @@ const shortConf = c => (c || '').replace(/ Conference$/, '').replace(/Atlantic C
 
 // ------------------------------------------------------------------------------------------------ team header
 function teamHeader(team, lg) {
-  return `<div class="th"><img class="logo" src="${esc(team.logo)}" alt=""><div style="flex:1;min-width:240px"><div class="nm">${esc(team.name)}</div>
+  const on = favs.has(lg, team.id);
+  return `<div class="th"><img class="logo" src="${esc(team.logo)}" alt=""><div style="flex:1;min-width:240px"><div class="nm">${esc(team.name)} <button class="star ${on ? 'on' : ''}" data-fav="${team.id}" title="${on ? 'Remove from' : 'Add to'} favorites">${on ? '★' : '☆'}</button></div>
     <div class="small" style="opacity:.9;margin-top:4px">${esc([team.conf, team.division].filter(Boolean).join(' · '))}</div><div class="meta" id="thMeta"></div></div></div>`;
 }
 async function fillHeader(app, team, lg) {
@@ -156,6 +163,7 @@ async function teamTab(body, team, lg) {
     </div>
     <div class="grid" style="align-content:start">
       <div class="card"><h3 class="h3">Interesting facts</h3>${facts.length ? `<ul class="notes">${facts.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : '<div class="small mut">Facts appear once games are played.</div>'}<div id="wikiFacts"></div></div>
+      <div class="card" id="coachCard"><h3 class="h3">Head coach</h3><div class="loading"></div></div>
       <div class="card" id="inj"><h3 class="h3">Injury report</h3><div class="loading"></div></div>
       <div class="card" id="rosterMini"><h3 class="h3">Roster</h3><div class="loading"></div></div>
       <div class="card"><h3 class="h3">Team news</h3>${newsList(d.news, { limit: 6 })}</div>
@@ -191,6 +199,20 @@ async function teamTab(body, team, lg) {
       </tbody></table></div>${ros.coach ? `<div class="small mut" style="margin-top:6px">Head coach: <b>${esc(ros.coach.firstName)} ${esc(ros.coach.lastName)}</b>${ros.coach.experience ? ` (${ros.coach.experience} yrs)` : ''}</div>` : ''}`;
   };
   drawRoster();
+  const drawCoach = async () => {
+    const el = body.querySelector('#coachCard');
+    if (!el) return;
+    if (!ros.coach) { el.innerHTML = '<h3 class="h3">Head coach</h3><div class="small mut">Not listed.</div>'; return; }
+    const c = await coachProfile(lg, team, ros.coach, d.year);
+    if (!c || !body.querySelector('#coachCard')) return;
+    const rows = [['Record this season', c.season], ['Career record', c.career || c.wiki?.overall], ['Seasons as head coach', c.seasons || (c.exp ? `${c.exp}` : '')], ['Born', c.born ? `${c.born}${c.age ? ` (age ${c.age})` : ''}` : ''], ['Pronunciation', c.wiki?.pron]].filter(r => r[1]);
+    el.innerHTML = `<h3 class="h3">Head coach</h3><div class="b" style="font-size:16px">${esc(c.name)}</div>
+      ${rows.length ? `<table class="minitable" style="margin-top:6px"><tbody>${rows.map(([k, v]) => `<tr><td class="mut">${esc(k)}</td><td style="text-align:left;white-space:normal">${esc(v)}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${c.wiki?.highlights?.length ? `<ul class="notes small" style="margin-top:6px">${c.wiki.highlights.slice(0, 6).map(h => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+      ${c.wiki?.extract ? `<p class="small" style="margin:8px 0 0">${esc(c.wiki.extract)} <a class="link" href="${esc(c.wiki.url)}" target="_blank" rel="noopener">Wikipedia</a></p>` : ''}
+      <div class="src">${isPro(lg) ? 'Records: ESPN. ' : ''}Background: Wikipedia.</div>`;
+  };
+  if (ros.ready) drawCoach(); else { const uc = ros.subscribe(() => { if (ros.ready) { uc(); drawCoach(); } }); onLeave(uc); }
   let tmr; const un = ros.subscribe(() => { clearTimeout(tmr); tmr = setTimeout(drawRoster, 400); });
   onLeave(un);
 }
@@ -385,11 +407,23 @@ async function overviewTab(body, A, B, lg) {
       <div class="grid" style="align-content:start">
         ${pred}
         <div class="card"><h3 class="h3">Season series</h3>${series}</div>
+        <div class="card" id="lastMeet"><h3 class="h3">Last meeting</h3><div class="loading"></div></div>
         <div class="card" id="injboth"><h3 class="h3">Injury report</h3><div class="loading"></div></div>
         <div class="card"><h3 class="h3">Style contrast</h3><div class="grid g2" style="gap:10px"><div><b>${esc(A.abbr)}</b><ul class="notes small">${teamStyle(ra, lg, n).slice(0, 4).map(s => `<li>${esc(s)}</li>`).join('') || '<li class="mut">No clear tendencies yet.</li>'}</ul></div><div><b>${esc(B.abbr)}</b><ul class="notes small">${teamStyle(rb, lg, n).slice(0, 4).map(s => `<li>${esc(s)}</li>`).join('') || '<li class="mut">No clear tendencies yet.</li>'}</ul></div></div></div>
       </div>
     </div>`;
 
+  lastMeeting(lg, A, B, da, da.year).then(lm => {
+    const el = body.querySelector('#lastMeet');
+    if (!el) return;
+    if (!lm) { el.innerHTML = '<h3 class="h3">Last meeting</h3><div class="small mut">No meeting in the last three seasons.</div>'; return; }
+    const e = lm.ev;
+    const tops = id => (lm.top[id] || []).map(x => `${esc(x.name)} ${x.pts}p ${x.reb}r ${x.ast}a`).join(', ') || '–';
+    el.innerHTML = `<h3 class="h3">Last meeting</h3><div class="small"><b>${esc(fmtDate(e.date, { month: 'short', day: 'numeric', year: 'numeric' }))}</b>${lm.venue ? ' · ' + esc(lm.venue) : ''}</div>
+      <div style="font:700 18px var(--display);margin:4px 0">${esc(A.abbr)} ${e.us} – ${e.them} ${esc(B.abbr)} <span class="small mut">${esc(e.win ? A.abbr : B.abbr)} won${e.ot ? ' (OT)' : ''}</span></div>
+      <div class="small"><b>${esc(A.abbr)}:</b> ${tops(A.id)}</div><div class="small"><b>${esc(B.abbr)}:</b> ${tops(B.id)}</div>
+      ${lm.article?.h ? `<div class="small" style="margin-top:6px"><b>Recap:</b> ${esc(lm.article.h)}</div>` : ''}<a class="link small" href="#/${lg}/game/${e.id}">Box score →</a>`;
+  });
   const rA = roster(lg, A), rB = roster(lg, B);
   const draw = () => {
     const keyp = body.querySelector('#keyp'), inj = body.querySelector('#injboth'), story = body.querySelector('#story');
@@ -464,7 +498,8 @@ function boardTab(body, A, B, lg) {
           const note = [ps[0], ps[1], factNotes(p, ros.players, lg, { wiki: p.wiki })[0], roleNotes(p, ros.players, lg)[0]].filter(Boolean).slice(0, 2).join(' ');
           const extra = [p.injury ? `⚕ ${p.injury}` : '', p.recruit?.stars ? `${stars(p.recruit.stars)} #${p.recruit.rank || '–'} (${p.recruit.cls})` : '', (p.portal?.[0]?.from || p.transferFrom) ? `Transfer: ${p.portal?.[0]?.from || p.transferFrom}` : '', p.mock ? `Mock #${p.mock.pick}` : ''].filter(Boolean).join(' · ');
           const my = myNotes.get(`${lg}:${p.id}`);
-          return `<div class="pl"><div class="n">${esc(p.jersey ?? '')}</div><div><div class="nm">${esc(p.name)} <span class="mut" style="font-weight:500">${esc(bits.join(' · '))}</span></div><div class="ln">${esc(line)}${extra ? ' · ' + esc(extra) : ''}</div></div><div class="nt">${esc(note)}${my ? ` <b>✎ ${esc(my)}</b>` : ''}</div></div>`;
+          const say = sayName(p, lg);
+          return `<div class="pl"><div class="n">${esc(p.jersey ?? '')}</div><div><div class="nm">${esc(p.name)}${say ? ` <span class="gd-say">🔊 ${esc(say)}</span>` : ''} <span class="mut" style="font-weight:500">${esc(bits.join(' · '))}</span></div><div class="ln">${esc(line)}${extra ? ' · ' + esc(extra) : ''}</div></div><div class="nt">${esc(note)}${my ? ` <b>✎ ${esc(my)}</b>` : ''}</div></div>`;
         }).join('')}</div>`;
     };
     const el = body.querySelector('#board');

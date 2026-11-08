@@ -3,7 +3,7 @@ import { L, isPro, isCollege } from './league.js';
 import { espn, repo, safe } from './api.js';
 import { seasonYear } from './ctx.js';
 import { loadRoster } from './views/players.js';
-import { wikiTeam } from './notes.js';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js';
 import { num, normName } from './util.js';
 
 const rosterStore = new Map();
@@ -169,4 +169,82 @@ export function scheduleFacts(events, team, lg) {
   }
   void W; void L; void team;
   return f;
+}
+
+
+// ---------------------------------------------------------------- coach profile (ESPN record + Wikipedia background)
+const coachStore = new Map();
+export function coachProfile(lg, team, coach, year) {
+  if (!coach) return Promise.resolve(null);
+  const key = lg + ':' + coach.id;
+  if (coachStore.has(key)) return coachStore.get(key);
+  const p = (async () => {
+    const name = `${coach.firstName} ${coach.lastName}`;
+    const out = { name, id: coach.id, exp: coach.experience };
+    if (isPro(lg)) {
+      const c = await safe(espn.coach(lg, coach.id), null);
+      if (c) {
+        const ref = Array.isArray(c.careerRecords) ? c.careerRecords[0]?.$ref : c.careerRecords?.$ref;
+        const [car, cur] = await Promise.all([ref ? safe(espn.core(ref), null) : null, safe(espn.coachSeason(lg, year, coach.id), null)]);
+        out.career = car?.summary?.replace(/-0$/, '');
+        out.season = cur?.summary?.replace(/-0$/, '');
+        out.seasons = (c.coachSeasons || []).length || null;
+        out.born = c.birthPlace ? [c.birthPlace.city, c.birthPlace.state || c.birthPlace.country].filter(Boolean).join(', ') : '';
+        out.age = c.dateOfBirth ? Math.floor((Date.now() - new Date(c.dateOfBirth)) / 3.15576e10) : null;
+      }
+    }
+    out.wiki = await safe(wikiCoach(name, lg, team), null);
+    return out;
+  })();
+  coachStore.set(key, p);
+  return p;
+}
+
+// ---------------------------------------------------------------- last meeting between two teams
+export async function lastMeeting(lg, A, B, da, year) {
+  let ev = [...da.events].reverse().find(e => e.oppId === B.id && e.state === 'post');
+  for (let back = 1; !ev && back <= 2; back++) {
+    const sc = await safe(espn.schedule(lg, A.id, year - back), null);
+    ev = (sc?.events || []).map(e => simplifyEvent(e, A.id)).filter(e => e && e.oppId === B.id && e.state === 'post').pop();
+  }
+  if (!ev) return null;
+  const s = await safe(espn.summary(lg, ev.id, 86400), null);
+  const top = {};
+  for (const tp of s?.boxscore?.players || []) {
+    const st = tp.statistics?.[0];
+    if (!st) continue;
+    const keys = st.names || st.keys || [];
+    const ix = k => keys.indexOf(k);
+    const rows = (st.athletes || []).filter(r => r.stats?.length).map(r => ({ name: r.athlete.displayName, id: r.athlete.id, pts: +r.stats[ix('points')] || 0, reb: +r.stats[ix('rebounds')] || 0, ast: +r.stats[ix('assists')] || 0 }));
+    rows.sort((a, b) => b.pts - a.pts);
+    top[tp.team.id] = rows.slice(0, 3);
+  }
+  return { ev, top, article: s?.article ? { h: s.article.headline, d: s.article.description } : null, venue: s?.gameInfo?.venue?.fullName };
+}
+
+// ---------------------------------------------------------------- roster changes since last season
+const changeStore = new Map();
+export function rosterChanges(lg, team, players, year) {
+  const key = lg + ':' + team.id;
+  if (changeStore.has(key)) return changeStore.get(key);
+  const p = (async () => {
+    const prev = await safe(espn.prevAthletes(lg, year - 1, team.id), null);
+    const prevIds = new Set((prev?.items || []).map(i => (/athletes\/(\d+)/.exec(i.$ref || '') || [])[1]).filter(Boolean));
+    if (!prevIds.size) return null;
+    const curIds = new Set(players.map(p => p.id));
+    const additions = players.filter(p => !prevIds.has(p.id));
+    const goneIds = [...prevIds].filter(id => !curIds.has(id)).slice(0, 18);
+    const gone = await Promise.all(goneIds.map(async id => {
+      const [ath, st] = await Promise.all([safe(espn.coreAthlete(lg, id), null), safe(espn.athleteStats(lg, id), null)]);
+      const parsed = parseAthleteStats(st);
+      const last = (parsed?.seasons || []).filter(r => r.year === year - 1).sort((a, b) => (b.a.gamesPlayed || 0) - (a.a.gamesPlayed || 0))[0];
+      const now = (parsed?.seasons || []).find(r => r.year === year && r.teamId !== team.id);
+      const tref = /seasons\/(\d+)\/teams\/(\d+)/.exec(ath?.team?.$ref || '');
+      return { id, name: ath?.displayName || ath?.fullName || '', last: last?.a || null, nowTeamId: now?.teamId || (tref && +tref[1] === year && tref[2] !== team.id ? tref[2] : null) };
+    }));
+    gone.sort((a, b) => ((b.last?.avgMinutes || 0) - (a.last?.avgMinutes || 0)));
+    return { additions, departures: gone.filter(g => g.name) };
+  })();
+  changeStore.set(key, p);
+  return p;
 }

@@ -343,3 +343,49 @@ textarea.mynotes { width: 100%; min-height: 64px; resize: vertical; border: 1px 
 .drawer-in { width: min(980px, 96vw); height: 100%; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line); box-shadow: -10px 0 30px rgba(0,0,0,.3); }
 .drawer-h { position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 14px; z-index: 2; }
 .drawer .pc-b { border-top: 0; }
+
+/* ---------- favorites, shortcuts, live panel */
+.star { border: 0; background: none; color: inherit; font-size: 26px; line-height: 1; vertical-align: 3px; padding: 0 4px; opacity: .75; }
+.star.on { color: #ffd34d; opacity: 1; }
+.qk { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.qkt { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 999px; background: var(--panel2); }
+.qkt button { border: 0; background: none; display: inline-flex; align-items: center; gap: 6px; padding: 5px 4px 5px 10px; font-weight: 650; }
+.qkt a { padding: 5px 10px 5px 4px; color: var(--mut); }
+.qkt img, .qkm img { width: 20px; height: 20px; object-fit: contain; }
+.qkm { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; background: var(--panel2); font-weight: 650; font-size: 13px; }
+.qkm:hover, .qkt:hover { border-color: var(--acc); }
+kbd { display: inline-block; min-width: 22px; text-align: center; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--panel2); font: 600 12px var(--font); }
+.gd-sit { display: flex; gap: 8px; flex-basis: 100%; flex-wrap: wrap; }
+.gd-sit:empty { display: none; }
+.gd-sitt { font-size: 12.5px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; }
+.gd-sitt .chip { font-size: 10.5px; padding: 0 6px; }
+.gd-last { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mut); }
+.gd-livepanel { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .8fr); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 1050px) { .gd-livepanel { grid-template-columns: minmax(0, 1fr); } }
+.gd-lp { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.gd-lp .h3 { margin-bottom: 6px; }
+.gd-plays, .gd-alerts { max-height: 230px; overflow-y: auto; }
+.gd-livepanel.min .gd-plays, .gd-livepanel.min .gd-alerts { max-height: 92px; }
+.gd-play { display: grid; grid-template-columns: 62px minmax(0, 1fr) 62px; gap: 6px; padding: 3px 0 3px 7px; border-left: 3px solid var(--line); border-bottom: 1px solid var(--line2); font-size: 12.5px; }
+.gd-play span:last-child { text-align: right; }
+.gd-play.sc { font-weight: 650; }
+.gd-alert { font-size: 12.5px; padding: 5px 8px; border-radius: 7px; margin-bottom: 5px; background: var(--panel2); border-left: 3px solid var(--mut2); }
+.gd-alert.hot { border-left-color: var(--good); }
+.gd-alert.watch { border-left-color: var(--warn); }
+.gd-alert.bad { border-left-color: var(--bad); }
+.gd-alert.new { background: color-mix(in srgb, var(--warn) 14%, var(--panel2)); }
+.gd-run { font: 700 18px var(--display); color: var(--acc); margin-bottom: 4px; }
+.gd-pre { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 1250px) { .gd-pre { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .gd-pre { grid-template-columns: minmax(0, 1fr); } }
+.gd-say { font-weight: 500; font-size: 12px; color: var(--mut); }
+.gd-coach { font-size: 12.5px; }
+.gd-coach summary, .gd-chg summary { cursor: pointer; }
+.gd-chg { font-size: 12.5px; margin-top: 2px; }
+.gd-chg summary { font-weight: 650; }
+.gd-chg-in { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.gd-chg-in ul.notes { padding-left: 16px; }
+.gd-tsit { display: flex; gap: 6px; font-size: 11px; font-weight: 700; margin-right: 8px; }
+.gd-tsit span { background: rgba(255,255,255,.2); border-radius: 6px; padding: 1px 6px; }
+.gd-row.sel { box-shadow: inset 4px 0 0 var(--acc); background: var(--hover); }
+input.gd-pron { display: block; width: 100%; margin-top: 3px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--txt); font: inherit; font-size: 12.5px; }

@@ -309,7 +309,7 @@ export function parseGamelog(js) {
 }
 
 // ---------------------------------------------------------------- Wikipedia
-function cleanWiki(s) {
+export function cleanWiki(s) {
   if (!s) return '';
   let t = s;
   t = t.replace(/<ref[^>]*\/>/g, '').replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '').replace(/<!--[\s\S]*?-->/g, '');
@@ -322,7 +322,7 @@ function cleanWiki(s) {
   t = t.replace(/&nbsp;/g, ' ').replace(/[{}]+/g, '').replace(/\s+/g, ' ').replace(/(\d)([A-Z][A-Za-z]+:)/g, '$1; $2').replace(/;\s*\(/g, ' (').trim();
   return t;
 }
-function infobox(text) {
+export function infobox(text) {
   const out = {};
   if (!text) return out;
   const start = text.search(/\{\{\s*Infobox/i);
@@ -338,7 +338,7 @@ function infobox(text) {
   while ((m = re.exec(body + '\n}}'))) out[m[1].trim().toLowerCase()] = m[2].trim();
   return out;
 }
-function listItems(raw) {
+export function listItems(raw) {
   if (!raw) return [];
   let lines = raw.split(/\n/).map(l => l.trim()).filter(l => /^\*/.test(l)).map(l => cleanWiki(l.replace(/^\*+\s*/, '')));
   if (!lines.length) lines = raw.split(/<br\s*\/?>/i).map(cleanWiki);
@@ -362,14 +362,52 @@ export async function wikiPlayer(name, lg, team) {
     const school = [team?.location, team?.short, team?.nick].filter(Boolean);
     if (!school.some(s => extract.includes(s))) return null;
   }
-  const ib = infobox(lead?.parse?.wikitext?.['*']);
+  const wt = lead?.parse?.wikitext?.['*'] || '';
+  const ib = infobox(wt);
+  const pron = pronunciation(wt, extract);
   const sentences = extract.split(/(?<=[.!?])\s+(?=[A-Z])/).slice(0, 4).join(' ');
   const draft = ib.draft_year ? `${cleanWiki(ib.draft_year)}${ib.draft_round ? ', round ' + cleanWiki(ib.draft_round) : ''}${ib.draft_pick ? ', pick ' + cleanWiki(ib.draft_pick) : ''}${ib.draft_team ? ' by the ' + cleanWiki(ib.draft_team) : ''}` : '';
   return {
     title: cand.title, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(cand.title.replace(/ /g, '_'))}`,
     extract: sentences, hs: cleanWiki(ib.high_school), college: cleanWiki(ib.college), draft, nickname: cleanWiki(ib.nickname),
     nationality: cleanWiki(ib.nationality), highlights: listItems(ib.highlights || ib.career_highlights || ib.awards).slice(0, 12),
-    born: cleanWiki(ib.birth_place),
+    born: cleanWiki(ib.birth_place), pron,
+  };
+}
+
+/** Respelled pronunciation from Wikipedia ({{respell|...}} or a "/ dah-m-ay s-ar" style respelling in the lead). */
+export function pronunciation(wt, extract) {
+  const m = /\{\{\s*respell\s*\|([^}]+)\}\}/i.exec(wt || '');
+  if (m) {
+    const parts = m[1].split('|').map(x => x.trim()).filter(x => x && !x.includes('='));
+    let out = '';
+    parts.forEach((x, i) => { if (x === '_') out += ' '; else out += (i && !out.endsWith(' ') ? '-' : '') + x; });
+    if (out.trim()) return out.trim();
+  }
+  const m2 = /\/\s*([A-Za-z][A-Za-z\-' ]{2,40}?)\s*[,;)]/.exec((extract || '').slice(0, 320));
+  if (m2 && m2[1].includes('-')) return m2[1].trim();
+  return '';
+}
+
+/** Head coach background from Wikipedia (only when the article clearly matches). */
+export async function wikiCoach(name, lg, team) {
+  const res = await safe(wiki.search(`${name} basketball coach`, 6));
+  const key = normName(name);
+  const cand = (res?.query?.search || []).find(h => normName(h.title.replace(/\s*\(.*\)$/, '')) === key && /coach/i.test(h.snippet));
+  if (!cand) return null;
+  const [intro, lead] = await Promise.all([safe(wiki.intro(cand.title)), safe(wiki.lead(cand.title))]);
+  const extract = Object.values(intro?.query?.pages || {})[0]?.extract || '';
+  if (!/coach/i.test(extract)) return null;
+  if (team && ![team.location, team.short, team.nick, team.name].filter(Boolean).some(x => extract.includes(x))) return null;
+  const wt = lead?.parse?.wikitext?.['*'] || '';
+  const ib = infobox(wt);
+  const pick = keys => { for (const k of keys) if (ib[k]) return cleanWiki(ib[k]); return ''; };
+  return {
+    title: cand.title, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(cand.title.replace(/ /g, '_'))}`,
+    extract: extract.split(/(?<=[.!?])\s+(?=[A-Z])/).slice(0, 3).join(' '),
+    overall: pick(['overall', 'overall_record', 'coach_record', 'career_record']),
+    highlights: listItems(ib.accomplishments || ib.championships || ib.highlights || ib.awards).slice(0, 8),
+    pron: pronunciation(wt, extract),
   };
 }
 

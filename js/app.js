@@ -9,6 +9,56 @@ const app = $('#app');
 let cleanup = [];
 export function onLeave(fn) { cleanup.push(fn); }
 
+// ---------- keyboard shortcuts: global keys + keys a page registers with setKeys()
+let pageKeys = [];
+export function setKeys(list) { pageKeys = list; onLeave(() => { if (pageKeys === list) pageKeys = []; }); }
+const GLOBAL_KEYS = [
+  ['?', 'Show this list of shortcuts', () => help()],
+  ['1 – 4', 'Switch league: 1 NBA · 2 WNBA · 3 NCAA men · 4 NCAA women', null],
+  ['h', 'Home / matchup prep', () => { location.hash = `#/${state.lg}`; }],
+  ['s', 'Scores', () => { location.hash = `#/${state.lg}/scores`; }],
+  ['q', 'Search teams and players', () => { $('#q').focus(); }],
+  ['t', 'Light / dark mode', () => $('#themeBtn').click()],
+  ['[ ]', 'Previous / next tab', null],
+  ['g', 'Game Day tab (on a matchup)', () => { const m = /#\/(\w+)\/matchup\/(\d+)\/(\d+)/.exec(location.hash); if (m) location.hash = `#/${m[1]}/matchup/${m[2]}/${m[3]}/gameday`; }],
+  ['x', 'Swap home and away (on a matchup)', () => { const sw = document.querySelector('.tabs a[title="Swap home/away"]'); if (sw) sw.click(); }],
+];
+function help() {
+  let ov = $('#helpOv');
+  if (ov) { ov.remove(); return; }
+  ov = document.createElement('div');
+  ov.id = 'helpOv'; ov.className = 'drawer';
+  const row = ([k, d]) => `<tr><td class="l"><kbd>${esc(k)}</kbd></td><td class="l" style="white-space:normal">${esc(d)}</td></tr>`;
+  ov.innerHTML = `<div class="drawer-in" style="width:min(520px,96vw)"><div class="row drawer-h"><b>Keyboard shortcuts</b><span class="sp"></span><button class="btn sm" id="helpX">Close ✕</button></div><div style="padding:14px">
+    ${pageKeys.length ? `<h3 class="h3">This page</h3><table class="minitable">${pageKeys.map(row).join('')}</table>` : ''}
+    <h3 class="h3" style="margin-top:14px">Everywhere</h3><table class="minitable">${GLOBAL_KEYS.map(row).join('')}</table>
+    <div class="small mut" style="margin-top:10px">Shortcuts are ignored while you're typing in a box. Press Esc to leave a box.</div></div></div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click', e => { if (e.target === ov || e.target.id === 'helpX') ov.remove(); });
+}
+window.__csHelp = help;
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable) {
+    if (e.key === 'Escape') document.activeElement.blur();
+    return;
+  }
+  if (e.key === 'Escape' && $('#helpOv')) { $('#helpOv').remove(); return; }
+  const pk = pageKeys.find(([k]) => k === e.key);
+  if (pk && pk[2]) { e.preventDefault(); pk[2](); return; }
+  if (/^[1-4]$/.test(e.key)) { setLeague(LEAGUE_KEYS[+e.key - 1]); return; }
+  if (e.key === '[' || e.key === ']') {
+    const tabs = [...document.querySelectorAll('.tabs a')].filter(a => !a.title);
+    const i = tabs.findIndex(a => a.classList.contains('on'));
+    const n = tabs[i + (e.key === ']' ? 1 : -1)];
+    if (n) n.click();
+    return;
+  }
+  const g = GLOBAL_KEYS.find(([k]) => k === e.key);
+  if (g && g[2]) { e.preventDefault(); g[2](); }
+});
+
 const NAV = {
   nba: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Around the NBA'], ['standings', 'Standings'], ['draft', 'Draft']],
   wnba: [['', 'Matchup prep'], ['scores', 'Scores'], ['league', 'Around the WNBA'], ['standings', 'Standings'], ['draft', 'Draft']],

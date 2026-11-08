@@ -1,7 +1,7 @@
 import { L, isPro, isCollege } from '../league.js';
 import { esc, logoFor, ymd } from '../util.js';
 import { espn, repo, safe } from '../api.js';
-import { state, teams } from '../ctx.js';
+import { state, teams, favs, recents } from '../ctx.js';
 import { gameCard, newsList, gameStatus } from './common.js';
 
 export async function render(app, lg) {
@@ -19,6 +19,7 @@ export async function render(app, lg) {
       <button class="btn pri" id="go" style="padding:11px 26px;font-size:15px">Build full notes →</button>
       <button class="btn" id="swap" title="Swap teams">⇄ Swap</button>
     </div>
+    <div id="quick" style="margin-top:18px"></div>
     <div class="grid g-side" style="margin-top:22px">
       <div>
         <div class="row" style="margin-bottom:10px"><h2 class="h2" style="margin:0">Today's games</h2><span class="sp"></span><a class="link small" href="#/${lg}/scores">All scores &amp; dates →</a></div>
@@ -69,6 +70,25 @@ export async function render(app, lg) {
     else if (pickA || pickB) location.hash = `#/${lg}/team/${(pickA || pickB).id}`;
     else alert('Pick at least one team.');
   };
+
+  // favorites + recent matchups
+  const drawQuick = () => {
+    const f = favs.list(lg).map(id => T.byId[id]).filter(Boolean);
+    const r = recents.list(lg).filter(x => T.byId[x.a] && T.byId[x.b]);
+    const chip = t => `<img src="${esc(logoFor(t, state.theme))}" alt="">`;
+    app.querySelector('#quick').innerHTML = (f.length || r.length) ? `<div class="grid g2">
+      <div class="card"><div class="row"><h3 class="h3" style="margin:0">★ Favorites</h3><span class="sp"></span><span class="small mut">Click a team to pick it, or open its page</span></div>
+        <div class="qk">${f.map(t => `<span class="qkt"><button data-pick="${t.id}" title="Use as a pick">${chip(t)}${esc(t.short || t.name)}</button><a href="#/${lg}/team/${t.id}" title="Team page">↗</a></span>`).join('') || '<span class="small mut">Star a team on its page to pin it here.</span>'}</div></div>
+      <div class="card"><div class="row"><h3 class="h3" style="margin:0">Recent matchups</h3><span class="sp"></span>${r.length ? '<button class="btn sm" id="clrRec">Clear</button>' : ''}</div>
+        <div class="qk">${r.map(x => `<a class="qkm" href="#/${lg}/matchup/${x.a}/${x.b}">${chip(T.byId[x.a])}${esc(T.byId[x.a].abbr)} <span class="mut2">@</span> ${chip(T.byId[x.b])}${esc(T.byId[x.b].abbr)}</a>`).join('') || '<span class="small mut">Matchups you open show up here.</span>'}</div></div></div>` : '';
+    app.querySelector('#clrRec')?.addEventListener('click', () => { recents.clear(lg); drawQuick(); });
+    app.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
+      const t = T.byId[b.dataset.pick];
+      if (!pickA || (pickA && pickB)) { pickA = t; if (pickB?.id === t.id) pickB = null; } else if (t.id !== pickA.id) pickB = t;
+      save(); drawA(); drawB();
+    }));
+  };
+  drawQuick();
 
   // today's games
   (async () => {
