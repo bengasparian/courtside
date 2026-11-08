@@ -164,7 +164,8 @@ def season_info():
                 types.append({"id": it.get("id"), "name": it.get("name"), "start": it.get("startDate"), "end": it.get("endDate")})
         except Exception:
             pass
-        info[key] = {"year": season.get("year"), "type": season.get("type"),
+        ls = lgi.get("season", {}) or {}
+        info[key] = {"year": season.get("year") or ls.get("year"), "type": season.get("type") or (ls.get("type") or {}).get("type"),
                      "startDate": lgi.get("season", {}).get("startDate"), "endDate": lgi.get("season", {}).get("endDate"),
                      "types": types}
     return info
@@ -523,26 +524,25 @@ def draft():
 
 # --------------------------------------------------------------------------------------------------------- CBB tasks
 def cbb_teams():
-    g = fetch(f"{SITE}/mens-college-basketball/groups")
+    """All Division I teams (ESPN team list) with conference membership from the full standings."""
     tl = fetch(f"{SITE}/mens-college-basketball/teams?limit=1000")
-    colors = {}
+    stmap, _ = standings_map("mens-college-basketball")
+    teams = []
+    confs = {}
     for t in tl["sports"][0]["leagues"][0]["teams"]:
         t = t["team"]
-        colors[t["id"]] = (t.get("color"), t.get("alternateColor"), t.get("nickname"), t.get("location"))
-    teams = []
-    confs = []
-    d1 = g["groups"][0]
-    for c in d1.get("children", []):
-        confs.append({"name": c.get("name"), "abbr": c.get("abbreviation"), "n": len(c.get("teams", []))})
-        for t in c.get("teams", []):
-            col = colors.get(t["id"], (None, None, None, None))
-            teams.append({"id": t["id"], "abbr": t.get("abbreviation"), "name": t.get("displayName"), "short": t.get("shortDisplayName"),
-                          "nick": t.get("name"), "location": col[3] or t.get("shortDisplayName"), "color": col[0], "alt": col[1],
-                          "logo": logo_of(t), "logoDark": dark_logo_of(t), "conf": c.get("name"), "confAbbr": c.get("abbreviation"), "slug": t.get("slug")})
+        st = stmap.get(t["id"], {})
+        conf = st.get("conf")
+        if conf:
+            c = confs.setdefault(conf, {"name": conf, "abbr": st.get("confAbbr"), "n": 0})
+            c["n"] += 1
+        teams.append({"id": t["id"], "abbr": t.get("abbreviation"), "name": t.get("displayName"), "short": t.get("shortDisplayName"),
+                      "nick": t.get("name"), "location": t.get("location"), "color": t.get("color"), "alt": t.get("alternateColor"),
+                      "logo": logo_of(t), "logoDark": dark_logo_of(t), "conf": conf, "confAbbr": st.get("confAbbr"), "slug": t.get("slug")})
     if len(teams) < 300:
         raise RuntimeError(f"too few cbb teams {len(teams)}")
     save("cbb/teams.json", teams)
-    save("cbb/conferences.json", confs)
+    save("cbb/conferences.json", sorted(confs.values(), key=lambda c: c["name"]))
 
 
 def cbb_standings():
