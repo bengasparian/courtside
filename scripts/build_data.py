@@ -316,10 +316,12 @@ def team_stats(key):
 def bpi(key):
     lg = LG[key]
     year = SEASONS[key]["year"]
-    first = fetch(f"{CORE}/{lg}/seasons/{year}/powerindex?limit=100&page=1")
-    pages = first.get("pageCount", 1)
+    url = f"{CORE}/{lg}/seasons/{year}/powerindex?limit=25&page="
+    first = fetch(url + "1")
+    size = first.get("pageSize") or len(first.get("items", [])) or 25
+    pages = max(first.get("pageCount", 1), -(-(first.get("count") or 0) // size))
     items = list(first.get("items", []))
-    rest = pmap(lambda p: fetch(f"{CORE}/{lg}/seasons/{year}/powerindex?limit=100&page={p}"), list(range(2, pages + 1)))
+    rest = pmap(lambda p: fetch(url + str(p)), list(range(2, pages + 1)))
     for p in range(2, pages + 1):
         items += (rest.get(p) or {}).get("items", [])
     out = {}
@@ -329,8 +331,9 @@ def bpi(key):
         if not m:
             continue
         out[m.group(1)] = {s["name"]: s.get("value") for s in it.get("stats", [])}
-    if not out:
-        raise RuntimeError("empty BPI")
+    expected = first.get("count") or 0
+    if not out or len(out) < 0.9 * expected:
+        raise RuntimeError(f"BPI incomplete: {len(out)} of {expected}")
     save(f"{key}/bpi.json", {"updated": (first.get("items") or [{}])[0].get("lastUpdated"), "teams": out})
 
 

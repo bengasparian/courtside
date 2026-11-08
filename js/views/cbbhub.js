@@ -73,11 +73,29 @@ async function conferences(app, params) {
 async function madness(app) {
   const [b, year, n] = await Promise.all([safe(repo('cbb/bpi.json'), null), seasonYear('cbb'), safe(espn.news('cbb', null, 50), null)]);
   const B = b?.teams || {};
-  const field = Object.entries(B).filter(([, s]) => s.projectedtournamentseed).sort((x, y) => (x[1].projectedtournamentorder || x[1].projectedtournamentseed * 4) - (y[1].projectedtournamentorder || y[1].projectedtournamentseed * 4));
+  let field = Object.entries(B).filter(([, s]) => s.projectedtournamentseed).sort((x, y) => (x[1].projectedtournamentorder || x[1].projectedtournamentseed * 4) - (y[1].projectedtournamentorder || y[1].projectedtournamentseed * 4));
+  let own = false;
+  if (field.length < 40) {
+    // ESPN hasn't published seed projections yet: build a 68-team field from BPI (best BPI team in each conference = automatic bid)
+    own = true;
+    const ranked = Object.entries(B).filter(([, s]) => s.bpirank).sort((x, y) => x[1].bpirank - y[1].bpirank);
+    const auto = new Map();
+    for (const [id, s] of ranked) { const c = T.byId[id]?.conf; if (c && !auto.has(c)) auto.set(c, id); }
+    const autoIds = new Set(auto.values());
+    const atLarge = ranked.filter(([id]) => !autoIds.has(id)).slice(0, 68 - autoIds.size);
+    const inField = new Set([...autoIds, ...atLarge.map(([id]) => id)]);
+    const order = ranked.filter(([id]) => inField.has(id));
+    // seed lines of 4, with the extra 4 teams as First Four on the 11 and 16 lines
+    const counts = [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 4, 4, 4, 4, 6];
+    let i = 0;
+    field = [];
+    counts.forEach((n, k) => { for (let j = 0; j < n && i < order.length; j++, i++) field.push([order[i][0], { ...order[i][1], projectedtournamentseed: k + 1, auto: autoIds.has(order[i][0]) }]); });
+  }
   const bySeed = {};
   for (const [id, s] of field) (bySeed[Math.round(s.projectedtournamentseed)] = bySeed[Math.round(s.projectedtournamentseed)] || []).push([id, s]);
   // bubble: last seeds in + best teams out
-  const out = Object.entries(B).filter(([, s]) => !s.projectedtournamentseed).sort((x, y) => (x[1].bpirank || 999) - (y[1].bpirank || 999)).slice(0, 8);
+  const fieldIds = new Set(field.map(([id]) => id));
+  const out = Object.entries(B).filter(([id]) => !fieldIds.has(id)).sort((x, y) => (x[1].bpirank || 999) - (y[1].bpirank || 999)).slice(0, 8);
   // live tournament bracket (mid-March to early April)
   const now = new Date();
   const tourney = now.getMonth() === 2 && now.getDate() >= 14 || (now.getMonth() === 3 && now.getDate() <= 8);
@@ -95,8 +113,8 @@ async function madness(app) {
   app.innerHTML = `<div class="row wrap"><h1 class="h1">March Madness ${year}</h1><span class="sp"></span><span class="small mut">Selection Sunday is mid-March; projections update every 2 hours</span></div>
     ${bracket}
     <div class="grid g-side" style="margin-top:12px">
-      <div class="card flush"><div class="card-h"><h3 class="h3">Projected field by seed (ESPN BPI)</h3><span class="small mut">${field.length} teams</span></div><div class="tscroll"><table class="t"><thead><tr><th>Seed</th><th>Teams</th></tr></thead><tbody>
-        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], 'cbb')}<span class="tiny mut">${s.wins}-${s.losses}${s.tournamentregion ? '' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
+      <div class="card flush"><div class="card-h"><h3 class="h3">Projected field by seed (${own ? 'Courtside projection from ESPN BPI' : 'ESPN BPI'})</h3><span class="small mut">${field.length} teams</span></div><div class="tscroll"><table class="t"><thead><tr><th>Seed</th><th>Teams</th></tr></thead><tbody>
+        ${Object.keys(bySeed).sort((a, c) => a - c).map(sd => `<tr><td class="l b" style="width:46px">${sd}</td><td class="l" style="white-space:normal"><div class="row wrap" style="gap:12px">${bySeed[sd].map(([id, s]) => `<span class="row" style="gap:6px">${teamCell(T.byId[id], 'cbb')}<span class="tiny mut">${s.wins}-${s.losses}${s.auto ? ' · auto' : ''}</span></span>`).join('')}</div></td></tr>`).join('') || '<tr><td class="empty">Projections appear once ESPN starts publishing tournament odds.</td></tr>'}
       </tbody></table></div></div>
       <div class="grid" style="align-content:start">
         <div class="card flush"><div class="card-h"><h3 class="h3">Best teams projected out</h3></div><table class="t"><tbody>${out.map(([id, s]) => `<tr><td class="l">${teamCell(T.byId[id], 'cbb')}</td><td>${s.wins}-${s.losses}</td><td class="small mut">BPI #${s.bpirank}</td></tr>`).join('')}</tbody></table></div>
@@ -104,7 +122,7 @@ async function madness(app) {
         <div class="card"><h3 class="h3">Bracket &amp; bubble news</h3>${newsList(madNews.length ? madNews : n?.articles, { limit: 6 })}</div>
       </div>
     </div>
-    <div class="src">Seeds and odds are ESPN BPI projections (automatic bids included), not the committee's bracket. The NCAA's NET ranking is the committee's main sorting tool: see Rankings → NET.</div>`;
+    <div class="src">${own ? 'ESPN has not published seed projections yet this season, so this field is built from BPI rankings: the top BPI team in each conference takes the automatic bid ("auto"), the best remaining teams fill the 68 at-large spots, and seeds follow the S-curve. It switches to ESPN\'s own projections once they appear.' : 'Seeds and odds are ESPN BPI projections (automatic bids included), not the committee\'s bracket.'} The NCAA's NET ranking is the committee's main sorting tool: see Rankings → NET.</div>`;
   void ymd; void fmtDate; void f1;
 }
 
