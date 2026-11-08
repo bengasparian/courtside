@@ -1,10 +1,10 @@
 // Live box score / game preview.
-import { L } from '../league.js';
-import { esc, logoFor, fmtDate, fmtTime, sparkline, num } from '../util.js';
-import { espn, safe } from '../api.js';
-import { state, teams, paint } from '../ctx.js';
-import { onLeave } from '../app.js';
-import { newsList } from './common.js';
+import { L } from '../league.js?v=fb64bb9f50';
+import { esc, logoFor, fmtDate, fmtTime, sparkline, num } from '../util.js?v=fb64bb9f50';
+import { espn, safe } from '../api.js?v=fb64bb9f50';
+import { state, teams, paint } from '../ctx.js?v=fb64bb9f50';
+import { onLeave } from '../app.js?v=fb64bb9f50';
+import { newsList } from './common.js?v=fb64bb9f50';
 
 export async function render(app, lg, id) {
   const T = await teams(lg);

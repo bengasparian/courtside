@@ -1,9 +1,9 @@
-import { isPro, isCollege } from '../league.js';
-import { esc, ymd } from '../util.js';
-import { espn, safe } from '../api.js';
-import { teams } from '../ctx.js';
-import { gameCard } from './common.js';
-import { onLeave } from '../app.js';
+import { isPro, isCollege } from '../league.js?v=fb64bb9f50';
+import { esc, ymd } from '../util.js?v=fb64bb9f50';
+import { espn, safe } from '../api.js?v=fb64bb9f50';
+import { teams } from '../ctx.js?v=fb64bb9f50';
+import { gameCard } from './common.js?v=fb64bb9f50';
+import { onLeave } from '../app.js?v=fb64bb9f50';
 
 export async function render(app, lg, params) {
   const T = await teams(lg);

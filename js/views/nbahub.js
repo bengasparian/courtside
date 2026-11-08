@@ -1,9 +1,9 @@
 // NBA league hub: season phase (Cup → All-Star → playoff race → playoffs), power rankings, standings, leaders, draft.
-import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, ymd } from '../util.js';
-import { espn, repo, wiki, safe } from '../api.js';
-import { state, teams, meta, seasonYear } from '../ctx.js';
-import { gameCard, newsList, teamCell, q } from './common.js';
-import { L, draftLeague } from '../league.js';
+import { esc, f1, pct, ordinal, signed, logoFor, fmtDate, fmtTime, ymd } from '../util.js?v=fb64bb9f50';
+import { espn, repo, wiki, safe } from '../api.js?v=fb64bb9f50';
+import { state, teams, meta, seasonYear } from '../ctx.js?v=fb64bb9f50';
+import { gameCard, newsList, teamCell, q } from './common.js?v=fb64bb9f50';
+import { L, draftLeague } from '../league.js?v=fb64bb9f50';
 
 let T, PL = 'nba';
 export async function render(app, view, params, lg = 'nba') {

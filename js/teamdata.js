@@ -1,10 +1,10 @@
 // Loads and caches everything about one team (used by team pages, matchups and the spotting board).
-import { L, isPro, isCollege } from './league.js';
-import { espn, repo, safe } from './api.js';
-import { seasonYear } from './ctx.js';
-import { loadRoster } from './views/players.js';
-import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js';
-import { num, normName } from './util.js';
+import { L, isPro, isCollege } from './league.js?v=fb64bb9f50';
+import { espn, repo, safe } from './api.js?v=fb64bb9f50';
+import { seasonYear } from './ctx.js?v=fb64bb9f50';
+import { loadRoster } from './views/players.js?v=fb64bb9f50';
+import { wikiTeam, wikiCoach, parseAthleteStats } from './notes.js?v=fb64bb9f50';
+import { num, normName } from './util.js?v=fb64bb9f50';
 
 const rosterStore = new Map();
 /** Roster with progressive player enrichment. subscribe(fn) gets called on every update. */
