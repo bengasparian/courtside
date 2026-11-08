@@ -57,7 +57,7 @@ export function gameCard(e, lg, T, { prep = true } = {}) {
 }
 
 export function newsList(articles, { limit = 8, img = true } = {}) {
-  const arts = (articles || []).filter(a => a && (a.headline || a.h)).slice(0, limit);
+  const arts = (articles || []).filter(a => a && (a.headline || a.h) && a.type !== 'Media' && !/: Game Highlights$|^Watch:/i.test(a.headline || a.h || '')).slice(0, limit);
   if (!arts.length) return '<div class="empty small">No recent news.</div>';
   return arts.map(a => {
     const h = a.headline || a.h, d = a.description || a.d, u = a.links?.web?.href || a.u, t = a.published || a.lastModified || a.t;

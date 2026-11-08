@@ -295,11 +295,32 @@ def team_stats(key):
     else:
         ids = [t["id"] for t in load("cbb/teams.json", [])]
     raw = pmap(lambda tid: fetch(f"{SITE}/{lg}/teams/{tid}/statistics"), ids, workers=10)
+    opp = {}
+    if key == "cbb":
+        scheds = pmap(lambda tid: fetch(f"{SITE}/{lg}/teams/{tid}/schedule"), ids, workers=10)
+        for tid, js in scheds.items():
+            pts, n = 0, 0
+            for e in (js or {}).get("events", []):
+                c = (e.get("competitions") or [{}])[0]
+                if not (c.get("status", {}).get("type", {}).get("completed")):
+                    continue
+                o = next((x for x in c.get("competitors", []) if x.get("id") != tid and (x.get("team") or {}).get("id") != tid), None)
+                sc = (o or {}).get("score")
+                v = num(sc.get("value") if isinstance(sc, dict) else sc)
+                if v is not None:
+                    pts += v; n += 1
+            if n:
+                opp[tid] = pts / n
     table = {}
     mins = 240 if key == "nba" else 200
     for tid in ids:
         try:
-            table[tid] = team_adv(raw.get(tid) or {}, stmap.get(tid), mins)
+            std = stmap.get(tid)
+            if tid in opp:
+                std = {"v": {**((std or {}).get("v") or {}), "avgPointsAgainst": opp[tid]}, "d": (std or {}).get("d", {})}
+            elif std and not std["v"].get("avgPointsAgainst"):
+                std = {"v": {k: v for k, v in std["v"].items() if k not in ("avgPointsAgainst", "pointsAgainst")}, "d": std["d"]}
+            table[tid] = team_adv(raw.get(tid) or {}, std, mins)
         except Exception as e:  # noqa: BLE001
             print("  adv fail", tid, e)
             table[tid] = None
@@ -559,20 +580,27 @@ def cbb_teams():
     save("cbb/conferences.json", sorted(confs.values(), key=lambda c: c["name"]))
 
 
+def wl(rec):
+    m = re.match(r"\s*(\d+)-(\d+)", rec or "")
+    return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
+
 def cbb_standings():
     stmap, raw = standings_map("mens-college-basketball")
     confs = {}
     for tid, s in stmap.items():
         v, d = s["v"], s["d"]
+        overall = d.get("total") or d.get("overall") or d.get("Overall") or ""
+        conf = d.get("vsconf") or d.get("vs. Conf.") or d.get("vsConf") or d.get("conference") or ""
+        w, l = wl(overall)
+        cw, cl = wl(conf)
         confs.setdefault(s["conf"], []).append({
-            "id": tid, "overall": d.get("total") or d.get("overall") or f"{int(v.get('wins') or 0)}-{int(v.get('losses') or 0)}",
-            "conf": d.get("vsconf") or d.get("vs. Conf.") or d.get("vsConf"), "w": v.get("wins"), "l": v.get("losses"),
-            "cw": v.get("vsConfWins") or v.get("conferenceWins"), "cl": v.get("vsConfLosses") or v.get("conferenceLosses"),
-            "cwp": v.get("vsConfWinPercent") or v.get("leagueWinPercent"), "wp": v.get("winPercent"),
-            "streak": d.get("streak"), "home": d.get("home") or d.get("Home"), "road": d.get("road") or d.get("Road"),
-            "ppg": v.get("avgPointsFor"), "oppg": v.get("avgPointsAgainst"), "gb": d.get("gamesBehind")})
+            "id": tid, "overall": overall or f"{w}-{l}", "conf": conf or "0-0", "w": w, "l": l, "cw": cw, "cl": cl,
+            "cwp": cw / (cw + cl) if cw + cl else None, "wp": w / (w + l) if w + l else None,
+            "streak": d.get("streak") if d.get("streak") not in (None, "-", "") else None, "home": d.get("home") or d.get("Home"), "road": d.get("road") or d.get("Road") or d.get("away"),
+            "gb": d.get("gamesBehind")})
     for k, lst in confs.items():
-        lst.sort(key=lambda r: (-(r["cwp"] or 0), -(r["cw"] or 0), -(r["wp"] or 0)))
+        lst.sort(key=lambda r: (-(r["cwp"] if r["cwp"] is not None else -1), -r["cw"], r["cl"], -(r["wp"] or 0), -r["w"]))
         for i, r in enumerate(lst, 1):
             r["confRank"] = i
     save("cbb/standings.json", confs)
