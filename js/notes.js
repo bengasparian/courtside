@@ -136,19 +136,24 @@ export function usgTier(u) {
 
 // ---------------------------------------------------------------- play style (rule-based scouting summary)
 export function playStyle(p, lg) {
-  const a = p.cur?.a, x = p.adv;
+  let a = p.cur?.a, x = p.adv;
   const notes = [];
+  if ((!a || (a.gamesPlayed || 0) < 5) && p.prev?.a?.gamesPlayed >= 8) {
+    a = p.prev.a; x = advanced(a, null, lg);
+    notes.push(`(Small sample this season, so this profile uses his ${p.prev.label} season: ${a.gamesPlayed} games${p.prevSchool ? ' at ' + p.prevSchool : ''}.)`);
+  }
   if (!a || !x || !a.gamesPlayed) return notes;
   const pm = lg === 'nba' ? 36 : 40;
   const d = T(lg);
   const pos = (p.pos || '').toUpperCase();
   const big = /C|PF|F-C|C-F/.test(pos) || (p.htIn && p.htIn >= 82);
   if (x.usg != null) notes.push(`${cap(usgTier(x.usg))}: uses ${f1(x.usg)}% of possessions when on the floor.`);
+  else if (x.p36 && notes.length) notes.push(`Scored ${f1(x.p36.pts)} points per ${pm} minutes (${f1(a.avgPoints)} per game).`);
   else if (x.p36) notes.push(`Scores ${f1(x.p36.pts)} points per ${pm} minutes.`);
   // shot profile
   if (x.tpar != null && a.avgFieldGoalsAttempted >= 3) {
     if (x.tpar >= 55) notes.push(`Perimeter-oriented: ${Math.round(x.tpar)}% of his shots are threes (${f1(a.avgThreePointFieldGoalsAttempted)} 3PA/game).`);
-    else if (x.tpar <= 12) notes.push(`Works almost entirely inside the arc. Only ${Math.round(x.tpar)}% of his attempts are threes.`);
+    else if (x.tpar <= 12) notes.push(x.tpar < 1 ? 'Works entirely inside the arc. He has not attempted a three.' : `Works almost entirely inside the arc. Only ${Math.round(x.tpar)}% of his attempts are threes.`);
     else if (x.tpar >= 40) notes.push(`Balanced shooter with range: ${Math.round(x.tpar)}% of attempts from three.`);
   }
   const tpp = a.threePointFieldGoalPct ?? a.threePointPct;
@@ -229,7 +234,7 @@ export function factNotes(p, roster, lg, extra = {}) {
     const streak = (test) => { let n = 0; for (const g of gl) { if (test(g)) n++; else break; } return n; };
     const s20 = streak(g => g.pts >= 20), s10 = streak(g => g.pts >= 10), sdd = streak(g => [g.pts, g.reb, g.ast].filter(v => v >= 10).length >= 2);
     if (s20 >= 3) facts.push(`Has scored 20+ in ${s20} straight games.`);
-    else if (s10 >= 5) facts.push(`Double-figure scoring in ${s10} straight games.`);
+    else if (s10 >= 5 && (a?.avgPoints || 0) < 15) facts.push(`Double-figure scoring in ${s10} straight games.`);
     if (sdd >= 2) facts.push(`Double-doubles in ${sdd} straight games.`);
     const last5 = gl.slice(0, 5);
     if (last5.length >= 3 && a?.avgPoints) {
@@ -279,7 +284,7 @@ export function parseGamelog(js) {
   const out = [];
   const st = js.seasonTypes.find(s => /Regular|Postseason/i.test(s.displayName)) || js.seasonTypes[0];
   for (const st2 of js.seasonTypes) {
-    if (!/Regular Season|Postseason/i.test(st2.displayName || '')) continue;
+    if (/Preseason/i.test(st2.displayName || '')) continue;
     for (const c of st2.categories || []) {
       if (c.type !== 'event') continue;
       for (const e of c.events || []) {
@@ -307,6 +312,7 @@ function cleanWiki(s) {
   if (!s) return '';
   let t = s;
   t = t.replace(/<ref[^>]*\/>/g, '').replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '').replace(/<!--[\s\S]*?-->/g, '');
+  t = t.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1');
   t = t.replace(/\{\{\s*(?:nbay|nba year|nbayear)\s*\|\s*(\d{4})[^}]*\}\}/gi, (m, y) => `${+y - 1}–${String(y).slice(2)}`);
   t = t.replace(/\{\{\s*(?:cbb ?link|cbbteam|cbb link)[^|]*\|([^|}]+)[^}]*\}\}/gi, '$1');
   for (let i = 0; i < 4; i++) t = t.replace(/\{\{\s*(?:small|nowrap|nobr|lang\|[a-z]+|abbr|sortname|flagicon[^|]*)\s*\|([^{}|]*)(?:\|[^{}]*)?\}\}/gi, '$1');
@@ -333,10 +339,9 @@ function infobox(text) {
 }
 function listItems(raw) {
   if (!raw) return [];
-  const flat = raw.replace(/\{\{\s*(?:plainlist|ubl|unbulleted list|flatlist)\s*\|?/gi, '').replace(/\}\}\s*$/, '');
-  let items = flat.split(/\n\s*\*|\{\{\s*\*\s*\}\}|\|(?![^[]*\]\])/).map(cleanWiki).filter(Boolean);
-  if (items.length <= 1) items = flat.split(/<br\s*\/?>/i).map(cleanWiki).filter(Boolean);
-  return items.filter(x => x.length > 2 && x.length < 160);
+  let lines = raw.split(/\n/).map(l => l.trim()).filter(l => /^\*/.test(l)).map(l => cleanWiki(l.replace(/^\*+\s*/, '')));
+  if (!lines.length) lines = raw.split(/<br\s*\/?>/i).map(cleanWiki);
+  return lines.map(x => x.replace(/[}{]+/g, '').replace(/^\W+/, '').trim()).filter(x => x.length > 2 && x.length < 160 && !/=|^medal/i.test(x));
 }
 
 /** Find the player's Wikipedia article (only when it clearly matches) and pull background facts. */

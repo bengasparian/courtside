@@ -66,6 +66,20 @@ async function enrich(p, ctx, onUpdate) {
   p.careerTot = p.parsed?.careerTot;
   p.careerMisc = p.parsed?.careerMisc;
   p.adv = advanced(p.cur?.a, tm, lg);
+  // previous season (for small early-season samples) and school path / transfers from ESPN season rows
+  const prevRows = (p.parsed?.seasons || []).filter(s => s.year < year && s.a?.gamesPlayed);
+  p.prev = prevRows.sort((a, b) => b.year - a.year || (b.a.gamesPlayed - a.a.gamesPlayed))[0] || null;
+  const TB = state._teamsById?.[lg] || {};
+  if (p.prev && p.prev.teamId !== team.id) p.prevSchool = TB[p.prev.teamId]?.short || TB[p.prev.teamId]?.name || '';
+  if (lg === 'cbb') {
+    const path = [];
+    for (const s of (p.parsed?.seasons || []).slice().sort((a, b) => a.year - b.year)) {
+      const nm = TB[s.teamId]?.short || TB[s.teamId]?.name || (s.teamSlug || '').replace(/-/g, ' ');
+      if (nm && (!path.length || path[path.length - 1].nm !== nm)) path.push({ nm, from: s.year, to: s.year, id: s.teamId }); else if (path.length) path[path.length - 1].to = s.year;
+    }
+    p.schoolPath = path;
+    p.transferFrom = path.length > 1 ? path[path.length - 2].nm : null;
+  }
   if (p.adv && lg === 'nba' && X.per[p.id]) { p.adv.per = X.per[p.id].per; p.adv.perRank = X.per[p.id].rank; }
   p.loaded.stats = true;
   // college extras (no requests)
@@ -84,7 +98,7 @@ async function enrich(p, ctx, onUpdate) {
   // 2) overview (news, RotoWire note, awards) + bio (ranks, draft) + game log in parallel
   const [ov, ath, gl] = await Promise.all([safe(espn.athleteOverview(lg, p.id), null), safe(espn.athlete(lg, p.id), null), safe(espn.gamelog(lg, p.id), null)]);
   if (ov) {
-    p.news = ov.news || [];
+    p.news = (ov.news || []).filter(n => n.type !== 'Media' && !/Highlights|^Watch/i.test(n.headline || ''));
     p.rotowire = ov.rotowire || null;
     p.outlook = ov.fantasy?.projection || null;
     p.awards = ov.awards || [];
@@ -95,14 +109,14 @@ async function enrich(p, ctx, onUpdate) {
     const a = ath.athlete;
     p.ranks = (a.statsSummary?.statistics || []).filter(s => s.rank);
     p.draft = a.displayDraft || '';
-    p.dobStr = a.displayDOB || '';
+    p.dobStr = p.dob ? new Date(p.dob).toLocaleDateString(undefined, { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' }) : (a.displayDOB || '');
     p.debut = a.debutYear;
     p.expStr = a.displayExperience || p.exp;
     if (!p.birthPlace && a.displayBirthPlace) p.birthPlace = a.displayBirthPlace;
     if (a.college?.name) p.college = a.college.name;
   }
   p.loaded.ath = true;
-  p.gamelog = parseGamelog(gl).filter(g => !g.post || true);
+  p.gamelog = parseGamelog(gl);
   p.loaded.gl = true;
   onUpdate?.(p);
   // 3) Wikipedia (background, high school, honors)
@@ -140,7 +154,8 @@ function tags(p, lg) {
   if (lg === 'cbb') {
     if (p.recruit?.stars) t.push(`<span class="chip amber" title="On3 Industry ranking">${stars(p.recruit.stars)} ${p.recruit.rank ? '#' + p.recruit.rank + ' in ' + p.recruit.cls : p.recruit.cls + ' class'}</span>`);
     const tr = p.portal?.[0];
-    if (tr?.from && !sameSchool(tr.from, { location: '' })) t.push(`<span class="chip">↪ Transfer from ${esc(tr.from)}</span>`);
+    if (tr?.from) t.push(`<span class="chip">↪ Transfer from ${esc(tr.from)}</span>`);
+    else if (p.transferFrom) t.push(`<span class="chip">↪ Transfer from ${esc(p.transferFrom)}</span>`);
     if (p.mock) t.push(`<span class="chip green">Mock draft: #${p.mock.pick}${p.mock.team ? ' (' + esc(p.mock.team) + ')' : ''}</span>`);
     else if (p.board) t.push(`<span class="chip green">Big board #${p.board.pick}</span>`);
   }
@@ -187,7 +202,8 @@ function advHTML(p, lg) {
   if (!x) return '<div class="small mut">Needs at least one game this season.</div>';
   const k = (key, v, sub) => `<div class="kpi"><div class="k">${GLOSSARY[key].label}${q(key, lg)}</div><div class="v">${v}</div>${sub ? `<div class="r">${sub}</div>` : ''}</div>`;
   const pm = lg === 'nba' ? 36 : 40;
-  return `<div class="adv">
+  const small = (p.cur?.a?.gamesPlayed || 0) < 5 ? `<div class="small warn" style="margin-bottom:6px">Small sample: ${p.cur?.a?.gamesPlayed} game${p.cur?.a?.gamesPlayed === 1 ? '' : 's'} this season.</div>` : '';
+  return `${small}<div class="adv">
     ${k('ts', pct(x.ts), tsTier(x.ts, lg))}
     ${k('efg', pct(x.efg))}
     ${x.usg != null ? k('usg', pct(x.usg), usgTier(x.usg).split(' ')[0] === 'heliocentric' ? 'star load' : usgTier(x.usg).replace(' role player', '').replace(' role', '')) : ''}
@@ -211,6 +227,7 @@ function backgroundHTML(p, lg) {
   const hs = p.recruit?.hs || p.portal?.[0]?.hs || p.wiki?.hs;
   add('High school', esc(hs ? hs + (p.recruit?.hometown ? ` (${p.recruit.hometown})` : '') : ''));
   if (lg === 'cbb' && p.recruit) add('Recruiting', `${stars(p.recruit.stars)} ${p.recruit.rating ? '(' + f1(p.recruit.rating) + ') ' : ''}Class of ${p.recruit.cls}${p.recruit.rank ? ` · <b>#${p.recruit.rank}</b> nationally` : ''}${p.recruit.posRank ? ` · #${p.recruit.posRank} ${esc(p.recruit.pos || '')}` : ''}${p.recruit.stateRank ? ` · #${p.recruit.stateRank} in ${esc(p.recruit.state || 'state')}` : ''} <span class="mut2">(On3 Industry)</span>`);
+  if (lg === 'cbb' && p.schoolPath?.length > 1) add('College path', p.schoolPath.map(x => `${esc(x.nm)} (${x.from - 1}-${String(x.to).slice(2)})`).join(' → '));
   if (lg === 'cbb' && p.portal?.length) {
     const hist = p.portal[0].history?.length ? p.portal[0].history.map(h => `${esc(h.team)} (${h.from}${h.to && h.to !== h.from ? '–' + String(h.to).slice(2) : ''})`).join(' → ') : '';
     add('Transfer', p.portal.map(e => `${e.year} portal: ${esc(e.from || '?')} → <b>${esc(e.to || 'uncommitted')}</b>${e.stars ? ` · ${stars(e.stars)} transfer${e.rank ? ' #' + e.rank : ''}` : ''}`).join('<br>') + (hist ? `<br><span class="mut">Path: ${hist}</span>` : ''));

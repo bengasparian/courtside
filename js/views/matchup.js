@@ -413,8 +413,8 @@ function storylines(A, B, da, db, lg, rA, rB) {
     if (seed(da) || seed(db)) s.push(`March Madness: ESPN BPI projects ${esc(A.short)} ${seed(da) ? 'as a ' + Math.round(seed(da)) + ' seed' : 'outside the field'} and ${esc(B.short)} ${seed(db) ? 'as a ' + Math.round(seed(db)) + ' seed' : 'outside the field'}.`);
     const pros = [...(rA.players || []), ...(rB.players || [])].filter(p => p.mock || (p.board && p.board.pick <= 40));
     if (pros.length) s.push(`NBA scouts in the building: ${pros.map(p => `${esc(p.name)} (${p.mock ? 'mock #' + p.mock.pick : 'big board #' + p.board.pick})`).join(', ')}.`);
-    const tr = [...(rA.players || []), ...(rB.players || [])].filter(p => p.portal?.length);
-    if (tr.length) s.push(`Transfers to note: ${tr.slice(0, 6).map(p => `${esc(p.name)} (from ${esc(p.portal[0].from || '?')})`).join(', ')}.`);
+    const tr = [...(rA.players || []), ...(rB.players || [])].filter(p => (p.portal?.[0]?.from || p.transferFrom) && p.cur?.a?.gamesPlayed);
+    if (tr.length) s.push(`Transfers to note: ${tr.slice(0, 8).map(p => `${esc(p.name)} (from ${esc(p.portal?.[0]?.from || p.transferFrom)})`).join(', ')}.`);
     const rec5 = [...(rA.players || []), ...(rB.players || [])].filter(p => p.recruit?.stars >= 5);
     if (rec5.length) s.push(`Former five-star recruits: ${rec5.map(p => `${esc(p.name)} (#${p.recruit.rank} in ${p.recruit.cls})`).join(', ')}.`);
   }
@@ -422,7 +422,7 @@ function storylines(A, B, da, db, lg, rA, rB) {
   if (ra?.pace && rb?.pace && Math.abs(ra.rk.pace - rb.rk.pace) > (da.n * 0.5)) s.push(`Tempo clash: ${esc(ra.pace > rb.pace ? A.abbr : B.abbr)} wants to run (${f1(Math.max(ra.pace, rb.pace))} poss.), ${esc(ra.pace > rb.pace ? B.abbr : A.abbr)} plays slower (${f1(Math.min(ra.pace, rb.pace))}).`);
   if (ra?.ortg && rb?.drtg && ra.rk.ortg <= 5 && rb.rk.drtg <= 5) s.push(`Strength on strength: ${esc(A.abbr)}'s top-5 offense against ${esc(B.abbr)}'s top-5 defense.`);
   if (rb?.ortg && ra?.drtg && rb.rk.ortg <= 5 && ra.rk.drtg <= 5) s.push(`Strength on strength: ${esc(B.abbr)}'s top-5 offense against ${esc(A.abbr)}'s top-5 defense.`);
-  const hot = [...(rA.players || []), ...(rB.players || [])].map(p => ({ p, f: factNotes(p, [], lg).find(x => /Heating up|straight games|Hot from deep/.test(x)) })).filter(x => x.f);
+  const hot = [...(rA.players || []), ...(rB.players || [])].map(p => ({ p, f: factNotes(p, [], lg).find(x => /Heating up|20\+ in|Double-doubles in|Hot from deep/.test(x)) })).filter(x => x.f);
   for (const h of hot.slice(0, 4)) s.push(`${esc(h.p.name)}: ${esc(h.f)}`);
   const ms = [...(rA.players || []), ...(rB.players || [])].map(p => ({ p, f: factNotes(p, [], lg).find(x => /Milestone/.test(x)) })).filter(x => x.f);
   for (const h of ms.slice(0, 3)) s.push(`${esc(h.p.name)}: ${esc(h.f)}`);
@@ -447,7 +447,7 @@ function boardTab(body, A, B, lg) {
           const line = a ? `${f1(a.avgPoints)}p ${f1(a.avgRebounds)}r ${f1(a.avgAssists)}a · ${f1(a.fieldGoalPct)} FG · ${f1(a.threePointFieldGoalPct ?? a.threePointPct)} 3P · ${f1(a.avgMinutes)} min` : 'No stats this season';
           const bits = [p.posName || p.pos, p.ht, lg === 'cbb' ? p.exp : (p.expStr || p.exp), p.recruit?.hs || p.wiki?.hs || '', lg === 'nba' ? (p.college || '') : (p.birthPlace || '')].filter(Boolean);
           const note = [roleNotes(p, ros.players, lg)[0], playStyle(p, lg)[1] || playStyle(p, lg)[0], factNotes(p, ros.players, lg, { wiki: p.wiki })[0]].filter(Boolean).slice(0, 2).join(' ');
-          const extra = [p.injury ? `⚕ ${p.injury}` : '', p.recruit?.stars ? `${stars(p.recruit.stars)} #${p.recruit.rank || '–'} (${p.recruit.cls})` : '', p.portal?.[0]?.from ? `Transfer: ${p.portal[0].from}` : '', p.mock ? `Mock #${p.mock.pick}` : ''].filter(Boolean).join(' · ');
+          const extra = [p.injury ? `⚕ ${p.injury}` : '', p.recruit?.stars ? `${stars(p.recruit.stars)} #${p.recruit.rank || '–'} (${p.recruit.cls})` : '', (p.portal?.[0]?.from || p.transferFrom) ? `Transfer: ${p.portal?.[0]?.from || p.transferFrom}` : '', p.mock ? `Mock #${p.mock.pick}` : ''].filter(Boolean).join(' · ');
           const my = myNotes.get(`${lg}:${p.id}`);
           return `<div class="pl"><div class="n">${esc(p.jersey ?? '')}</div><div><div class="nm">${esc(p.name)} <span class="mut" style="font-weight:500">${esc(bits.join(' · '))}</span></div><div class="ln">${esc(line)}${extra ? ' · ' + esc(extra) : ''}</div></div><div class="nt">${esc(note)}${my ? ` <b>✎ ${esc(my)}</b>` : ''}</div></div>`;
         }).join('')}</div>`;

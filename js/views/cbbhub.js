@@ -114,12 +114,12 @@ async function portal(app, params) {
   const years = [...new Set(rows.map(r => r.year))].sort((a, b) => b - a);
   const yr = +(params.get('y') || years[0] || 0);
   const pn = (n?.articles || []).filter(a => /transfer|portal/i.test(`${a.headline} ${a.description}`));
-  app.innerHTML = `<div class="row wrap"><h1 class="h1">Transfer portal</h1><span class="sp"></span>${years.map(y => `<a class="chip ${y === yr ? 'acc' : ''}" href="#/cbb/portal?y=${y}">${y}</a>`).join(' ')}</div>
+  app.innerHTML = `<div class="row wrap"><h1 class="h1">Transfer portal: top moves</h1><span class="sp"></span>${years.map(y => `<a class="chip ${y === yr ? 'acc' : ''}" href="#/cbb/portal?y=${y}">${y}</a>`).join(' ')}</div>
     <div class="grid g-side" style="margin-top:12px">
       <div class="card flush"><div class="card-h"><input id="pf" placeholder="Filter by player or school" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--txt)"><span class="small mut" id="pc"></span></div>
         <div class="tscroll" style="max-height:900px"><table class="t" id="pt"><thead><tr><th data-k="rank">Rank</th><th data-k="name">Player</th><th>Pos</th><th>From</th><th>To</th><th data-k="stars">★</th><th>Status</th><th>HS / hometown</th></tr></thead><tbody></tbody></table></div></div>
       <div class="card"><h3 class="h3">Portal news</h3>${newsList(pn.length ? pn : n?.articles, { limit: 10 })}</div>
-    </div><div class="src">Source: On3 Transfer Portal, refreshed twice a day. A transferred player's history also appears on his card in the matchup view.</div>`;
+    </div><div class="src">Source: On3 Transfer Portal's top-rated entries (about 50 per portal year), refreshed twice a day. For every D-I player, his full school path and "Transfer from" tag are on his card in the matchup view (from ESPN season data).</div>`;
   const tb = app.querySelector('#pt tbody');
   const draw = () => {
     const f = app.querySelector('#pf').value.toLowerCase();
