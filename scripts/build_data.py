@@ -412,12 +412,11 @@ def nba_cup():
     try:
         wt = fetch(f"https://en.wikipedia.org/w/api.php?action=parse&page={start_year}_NBA_Cup&prop=wikitext&format=json&redirects=1")
         text = wt["parse"]["wikitext"]["*"]
-        for m in re.finditer(r"(East|West)\s+Group\s+([A-C])", text):
-            pass
         # Each group block: heading "East Group A" followed by name_XXX=[[... season|Team Name]] lines.
-        parts = re.split(r"\n=+\s*((?:East|West)(?:ern Conference)?\s+Group\s+[A-C])\s*=+", text)
+        parts = re.split(r"\n=+\s*((?:East|West)(?:ern Conference)?\s+group\s+[A-C])\s*=+", text, flags=re.I)
         for i in range(1, len(parts), 2):
-            gname = parts[i].replace("ern Conference", "")
+            m2 = re.match(r"(East|West)\w*(?: Conference)?\s+group\s+([A-C])", parts[i], re.I)
+            gname = f"{m2.group(1).title()} Group {m2.group(2).upper()}"
             block = parts[i + 1]
             names = re.findall(r"\|name_[A-Z]+\s*=\s*\[\[[^\]|]*\|([^\]]+)\]\]", block)
             ids = [by_name[n]["id"] for n in names if n in by_name]
