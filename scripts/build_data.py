@@ -419,7 +419,11 @@ def nba_cup():
             gname = f"{m2.group(1).title()} Group {m2.group(2).upper()}"
             block = parts[i + 1]
             names = re.findall(r"\|name_[A-Z]+\s*=\s*\[\[[^\]|]*\|([^\]]+)\]\]", block)
-            ids = [by_name[n]["id"] for n in names if n in by_name]
+            ids = []
+            for n in names:
+                t = by_name.get(n) or next((x for x in teams if x.get("nick") and n.strip().endswith(x["nick"])), None)
+                if t:
+                    ids.append(t["id"])
             if len(ids) >= 4:
                 groups[gname] = ids[:5]
     except Exception as e:  # noqa: BLE001
