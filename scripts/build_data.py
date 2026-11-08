@@ -335,28 +335,39 @@ def team_stats(key):
 
 
 def bpi(key):
-    """ESPN BPI for every team (fitt endpoint, all teams); falls back to the core API (top teams only)."""
+    """ESPN BPI. The core API has every field but (for college) only the top 25; the fitt endpoint has every team.
+    Merge: fitt as the base, core values on top, then fill in any missing ranks."""
     lg = LG[key]
+    merged, updated = {}, None
     try:
         js = fetch(f"https://site.web.api.espn.com/apis/fitt/v3/sports/basketball/{lg}/powerindex?limit=500")
         names = {c["name"]: c.get("names") or [] for c in js.get("categories", [])}
-        out = {}
         for t in js.get("teams", []):
             tid = str((t.get("team") or {}).get("id"))
-            d = {}
+            d = merged.setdefault(tid, {})
             for c in t.get("categories", []):
                 for n, v in zip(names.get(c.get("name"), []), c.get("values") or []):
-                    if n and (d.get(n) is None):
+                    if n and d.get(n) is None:
                         d[n] = v
-            out[tid] = d
-        expected = (js.get("pagination") or {}).get("count") or 0
-        if out and len(out) >= 0.9 * expected:
-            save(f"{key}/bpi.json", {"updated": js.get("lastUpdated"), "teams": out, "source": "fitt"})
-            return
-        print("  fitt BPI incomplete", len(out), expected)
+        updated = js.get("lastUpdated")
     except Exception as e:  # noqa: BLE001
         print("  fitt BPI failed", e)
-    bpi_core(key)
+    try:
+        core = bpi_core(key)
+        for tid, d in core["teams"].items():
+            merged.setdefault(tid, {}).update({k: v for k, v in d.items() if v is not None})
+        updated = updated or core.get("updated")
+    except Exception as e:  # noqa: BLE001
+        print("  core BPI failed", e)
+    if not merged:
+        raise RuntimeError("no BPI data")
+    for k, desc in (("bpioffense", True), ("bpidefense", True), ("bpi", True)):
+        rk = k + "rank" if k != "bpi" else "bpirank"
+        vals = sorted([(d.get(k), t) for t, d in merged.items() if d.get(k) is not None], reverse=desc)
+        for i, (_, t) in enumerate(vals, 1):
+            if merged[t].get(rk) is None:
+                merged[t][rk] = i
+    save(f"{key}/bpi.json", {"updated": updated, "teams": merged})
 
 
 def bpi_core(key):
@@ -377,10 +388,7 @@ def bpi_core(key):
         if not m:
             continue
         out[m.group(1)] = {s["name"]: s.get("value") for s in it.get("stats", [])}
-    expected = first.get("count") or 0
-    if not out or len(out) < 0.9 * expected:
-        raise RuntimeError(f"BPI incomplete: {len(out)} of {expected}")
-    save(f"{key}/bpi.json", {"updated": (first.get("items") or [{}])[0].get("lastUpdated"), "teams": out})
+    return {"updated": (first.get("items") or [{}])[0].get("lastUpdated"), "teams": out}
 
 
 def nba_power():
